@@ -59,13 +59,29 @@ class BridgeManager:
         if handler is not None:
             handler(event, *event.args, **event.kwargs)
 
+    def once(self):
+        event = self.events.get()
+        self._dispatch(event)
+
+        for bridge in self._bridges.values():
+            bridge.dispatch(event)
+
     def run(self):
+        self._running = True
+        try:
+            while self._running:
+                self.once()
+        finally:
+            self.terminate()
+
+    def terminate(self):
         while True:
-            event = self.events.get()
-            print(event)
-            self._dispatch(event)
-            for bridge in self._bridges.values():
-                bridge.dispatch(event)
+            try:
+                name, bridge = self._bridges.popitem()
+            except KeyError:
+                break
+
+            bridge.terminate()
 
 class BaseEvent:
     def __init__(self, bridge_id, name, *args, **kwargs):

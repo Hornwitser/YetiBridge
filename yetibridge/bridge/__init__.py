@@ -24,6 +24,9 @@ class BaseBridge:
     def is_registered(self):
         return hasattr(self, "_manager")
 
+    def terminate(self):
+        self._dispatch('on_terminate')
+
     def _dispatch(self, name, *args, **kwargs):
         handler = getattr(self, name, None)
         if handler is not None:
