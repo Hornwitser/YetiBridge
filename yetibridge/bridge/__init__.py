@@ -10,7 +10,12 @@ class BaseBridge:
             raise ValueError("Bridge already registered!")
 
         self._manager = manager
-        self.init()
+        self._dispatch('on_register')
+
+    def _dispatch(self, name, *args, **kwargs):
+        handler = getattr(self, name, None)
+        if handler is not None:
+            handler(*args, **kwargs)
 
     def dispatch(self, event):
         handler = getattr(self, 'ev_{}'.format(event.name), None)

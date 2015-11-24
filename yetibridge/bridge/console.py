@@ -9,7 +9,7 @@ class ConsoleBridge(BaseBridge):
         self._thread = threading.Thread(target=self.run)
         self.users = {}
 
-    def init(self):
+    def on_register(self):
         self._thread.start()
 
     def run(self):
