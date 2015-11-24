@@ -6,7 +6,7 @@ from .. import BaseEvent
 class ConsoleBridge(BaseBridge):
     def __init__(self, config):
         BaseBridge.__init__(self, config)
-        self._thread = threading.Thread(target=self.run)
+        self._thread = threading.Thread(target=self.run, daemon=True)
         self.users = {}
 
     def on_register(self):
