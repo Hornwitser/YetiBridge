@@ -9,8 +9,8 @@ class BridgeManager:
         self._users = {}
 
     def attach(self, name, bridge):
-        if name in self._bridges:
-            raise ValueError("Bridge already attached!")
+        assert name not in self._bridges, \
+            "Bridge '%s' is already attached!" % name
 
         for user_id, user in self._users.items():
             event = BaseEvent(id(self), 'user_joined', user_id, user['nick'])
@@ -20,9 +20,7 @@ class BridgeManager:
         bridge.register(self)
 
     def detach(self, name):
-        if name not in self._bridges:
-            raise ValueError("Bridge not attached!")
-
+        assert name in self._bridges, "Bridge '%s' is not attached!" % name
         self._bridges[name].deregister()
 
     def _ev_bridge_detach(self, event):

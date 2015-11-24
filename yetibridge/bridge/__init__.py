@@ -6,15 +6,15 @@ class BaseBridge:
         self.imposters = {}
 
     def register(self, manager):
-        if self.is_registered:
-            raise ValueError("Bridge already registered!")
+        assert not self.is_registered, \
+            "This '%s' is already registered" % self.__class__
 
         self._manager = manager
         self._dispatch('on_register')
 
     def deregister(self):
-        if not self.is_registered:
-            raise ValueError("Bridge not registered!")
+        assert self.is_registered, \
+            "This '%s' is not registered!" % self.__class__
 
         self._dispatch('on_deregister')
         self.send_event('bridge_detach')
@@ -38,6 +38,6 @@ class BaseBridge:
             handler(event, *event.args, **event.kwargs)
 
     def send_event(self, name, *args, **kwargs):
-        if not self.is_registered:
-            raise ValueError("Bridge not registered!")
+        assert self.is_registered, \
+            "This '%s' is not registered!" % self.__class__
         self._manager.events.put(BaseEvent(id(self), name, *args, **kwargs))
