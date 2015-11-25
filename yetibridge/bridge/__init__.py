@@ -7,14 +7,14 @@ class BaseBridge:
 
     def register(self, manager):
         assert not self.is_registered, \
-            "This '%s' is already registered" % self.__class__
+            "this '%s' is already registered!" % self.__class__
 
         self._manager = manager
         self._dispatch('on_register')
 
     def deregister(self):
         assert self.is_registered, \
-            "This '%s' is not registered!" % self.__class__
+            "this '%s' is not registered!" % self.__class__
 
         self._dispatch('on_deregister')
         self.send_event('bridge_detach')
@@ -39,5 +39,5 @@ class BaseBridge:
 
     def send_event(self, name, *args, **kwargs):
         assert self.is_registered, \
-            "This '%s' is not registered!" % self.__class__
+            "this '%s' is not registered!" % self.__class__
         self._manager.events.put(BaseEvent(id(self), name, *args, **kwargs))
