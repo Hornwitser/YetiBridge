@@ -24,7 +24,7 @@ class BridgeManager:
         self._bridges[name].deregister()
 
     def _ev_bridge_detach(self, event):
-        name = self.get_bridge_name(event.bridge_id)
+        name = self._bridge_name(event.bridge_id)
         for user_id, user in self._users.items():
             if user['bridge'] == event.bride_id:
                 event = BaseEvent(event.bride_id, 'user_left', user_id)
@@ -36,12 +36,12 @@ class BridgeManager:
         del self._bridges[name]
 
 
-    def get_bridge_name(self, bridge_id):
+    def _bridge_name(self, bridge_id):
         for name, bridge in self._bridges.items():
             if id(bridge) == bridge_id:
                 return name
         else:
-            raise ValueError("No bridge with id %s found" % bridge_id)
+            raise ValueError("No bridge with id %s is attached" % bridge_id)
 
     def _ev_user_join(self, event, user_id, nick):
         self._users[user_id] = {'bridge': event.bridge_id, 'nick': nick}
