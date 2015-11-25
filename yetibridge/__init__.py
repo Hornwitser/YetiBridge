@@ -1,6 +1,8 @@
 import queue
 import collections
 
+from .parse import split
+
 class BridgeManager:
     def __init__(self, config):
         self.config = config
@@ -51,6 +53,30 @@ class BridgeManager:
 
     def _ev_user_leave(self, bridge_id, user_id):
         del self._users[user_id]
+
+    def _ev_bridge_command(self, event, string, authority):
+        try:
+            command = split(string)
+        except ValueError as e:
+            event.name = 'bridge_message'
+            event.args = ["error: {}".format(str(e))]
+            return
+
+        try:
+            target = id(self._bridges[command[0]])
+        except KeyError:
+            if command[0] == 'manager':
+                target = id(self)
+            else:
+                event.name = 'bridge_message'
+                event.args = ["error: '{}' no such bridge".format(command[0])]
+                return
+        except IndexError:
+            event.name = 'bridge_message'
+            event.args = ["error: empty command"]
+            return
+
+        event.args = [target, command[1:], authority]
 
     def _dispatch(self, event):
         handler = getattr(self, '_ev_{}'.format(event.name), None)
