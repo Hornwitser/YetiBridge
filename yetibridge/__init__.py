@@ -7,7 +7,7 @@ class BridgeManager:
     def __init__(self, config):
         self.config = config
         self.events = queue.Queue()
-        self._bridges = {}
+        self._bridges = {"manager": self}
         self._users = {}
 
     def attach(self, name, bridge):
@@ -16,7 +16,7 @@ class BridgeManager:
 
         for user_id, user in self._users.items():
             event = BaseEvent(id(self), 'user_joined', user_id, user['nick'])
-            bridge.dispatch(event)
+            bridge._dispatch(event)
 
         self._bridges[name] = bridge
         bridge.register(self)
@@ -33,7 +33,7 @@ class BridgeManager:
                 self.events.put(event)
             else:
                 event = BaseEvent(id(self), 'user_left', user_id)
-                self._bridges[name].dispatch(event)
+                self._bridges[name]._dispatch(event)
 
         del self._bridges[name]
 
@@ -83,12 +83,18 @@ class BridgeManager:
         if handler is not None:
             handler(event, *event.args, **event.kwargs)
 
+    def _translate(self, event):
+        handler = getattr(self, '_tr_{}'.format(event.name), None)
+        if handler is not None:
+            return handler(event, *event.args, **event.kwargs)
+        else:
+            return True
+
     def once(self):
         event = self.events.get()
-        self._dispatch(event)
-
-        for bridge in self._bridges.values():
-            bridge.dispatch(event)
+        if self._translate(event):
+            for bridge in self._bridges.values():
+                bridge._dispatch(event)
 
     def run(self):
         self._running = True
@@ -105,7 +111,8 @@ class BridgeManager:
             except KeyError:
                 break
 
-            bridge.terminate()
+            if bridge is not self:
+                bridge.terminate()
 
 class BaseEvent:
     def __init__(self, bridge_id, name, *args, **kwargs):

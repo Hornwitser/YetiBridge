@@ -10,13 +10,13 @@ class BaseBridge:
             "this '%s' is already registered!" % self.__class__
 
         self._manager = manager
-        self._dispatch('on_register')
+        self._hook('on_register')
 
     def deregister(self):
         assert self.is_registered, \
             "this '%s' is not registered!" % self.__class__
 
-        self._dispatch('on_deregister')
+        self._hook('on_deregister')
         self.send_event('bridge_detach')
         del self._manager
 
@@ -25,14 +25,15 @@ class BaseBridge:
         return hasattr(self, "_manager")
 
     def terminate(self):
-        self._dispatch('on_terminate')
+        self._hook('on_terminate')
 
-    def _dispatch(self, name, *args, **kwargs):
+    def _hook(self, name, *args, **kwargs):
         handler = getattr(self, name, None)
         if handler is not None:
             handler(*args, **kwargs)
 
-    def dispatch(self, event):
+    def _dispatch(self, event):
+        self._hook('on_event', event)
         handler = getattr(self, 'ev_{}'.format(event.name), None)
         if handler is not None:
             handler(event, *event.args, **event.kwargs)

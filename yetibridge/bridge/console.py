@@ -28,9 +28,6 @@ class ConsoleBridge(BaseBridge):
         except ValueError:
             pass
 
-        if item_id == id(self._manager):
-            return 'manager'
-
         return str(item_id)
 
     def ev_user_join(self, event, user_id, name):
