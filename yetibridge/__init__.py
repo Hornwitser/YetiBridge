@@ -3,6 +3,10 @@ import collections
 
 from .parse import split
 
+def _command(function):
+    function.is_command = True
+    return function
+
 class BridgeManager:
     def __init__(self, config):
         self.config = config
@@ -54,29 +58,51 @@ class BridgeManager:
     def _ev_user_leave(self, bridge_id, user_id):
         del self._users[user_id]
 
-    def _ev_bridge_command(self, event, string, authority):
+    def _tr_bridge_command(self, event, string, authority):
         try:
-            command = split(string)
+            words = split(string)
         except ValueError as e:
-            event.name = 'bridge_message'
-            event.args = ["error: {}".format(str(e))]
+            self._send_event('bridge_message', "error: {}".format(str(e)))
+            return False
+
+        if len(words) == 0:
+            self._send_event('bridge_message', "error: empty command")
+            return False
+
+        if words[0] not in self._bridges:
+            self._send_event('bridge_message',
+                             "error: '{}' no such bridge".format(words[0]))
+            return False
+
+        target = id(self._bridges[words[0]])
+        event.args = [target, words[1:], authority]
+        return True
+
+    def _ev_bridge_command(self, event, target, command, authority):
+        if target != id(self):
             return
 
-        try:
-            target = id(self._bridges[command[0]])
-        except KeyError:
-            if command[0] == 'manager':
-                target = id(self)
-            else:
-                event.name = 'bridge_message'
-                event.args = ["error: '{}' no such bridge".format(command[0])]
+        if len(command) == 0:
+            self._send_event('bridge_message', "error: empty command")
+            return
+
+        handler = getattr(self, '_{}'.format(command[0]), None)
+        if getattr(handler, "is_command", False):
+            try:
+                response = handler(*command[1:])
+            except Exception as e:
+                self._send_event('bridge_message', "error: {}".format(e))
                 return
-        except IndexError:
-            event.name = 'bridge_message'
-            event.args = ["error: empty command"]
-            return
 
-        event.args = [target, command[1:], authority]
+            if response is not None:
+                self._send_event('bridge_message', response)
+        else:
+            self._send_event('bridge_message',
+                             "error: '{}' unkown command".format(command[0]))
+
+    def _send_event(self, name, *args, **kwargs):
+        event = BaseEvent(id(self), name, *args, **kwargs)
+        self.events.put(event)
 
     def _dispatch(self, event):
         handler = getattr(self, '_ev_{}'.format(event.name), None)
