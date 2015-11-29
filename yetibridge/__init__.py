@@ -32,8 +32,8 @@ class BridgeManager:
     def _ev_bridge_detach(self, event):
         name = self._bridge_name(event.bridge_id)
         for user_id, user in self._users.items():
-            if user['bridge'] == event.bride_id:
-                event = BaseEvent(event.bride_id, 'user_left', user_id)
+            if user['bridge'] == event.bridge_id:
+                event = BaseEvent(event.bridge_id, 'user_left', user_id)
                 self.events.put(event)
             else:
                 event = BaseEvent(id(self), 'user_left', user_id)
