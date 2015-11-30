@@ -29,7 +29,7 @@ class BridgeManager:
         assert name in self._bridges, "bridge '%s' is not attached!" % name
         self._bridges[name].deregister()
 
-    def _ev_bridge_detach(self, event):
+    def _tr_bridge_detach(self, event):
         name = self._bridge_name(event.bridge_id)
         for user_id, user in self._users.items():
             if user['bridge'] == event.bridge_id:
@@ -40,7 +40,8 @@ class BridgeManager:
                 self._bridges[name]._dispatch(event)
 
         del self._bridges[name]
-
+        self._running = len(self._bridges) > 1
+        return True
 
     def _bridge_name(self, bridge_id):
         for name, bridge in self._bridges.items():
@@ -140,6 +141,10 @@ class BridgeManager:
             if bridge is not self:
                 bridge.terminate()
 
+    @_command
+    def _shutdown(self):
+        self._send_event('shutdown')
+
 class BaseEvent:
     def __init__(self, bridge_id, name, *args, **kwargs):
         self.bridge_id = bridge_id
@@ -159,6 +164,7 @@ class BaseEvent:
 'channel_command' # Command recieved from a bridged chat
 'private_message' # Message to a user across the bridge
 'bridge_broadcast' # Broadcast across the bridge
+'shutdown' # Global shutdown event, all brides are expected to detach
 'bridge_message' # Message to the bridge from a user
 'bridge_command' # Command to the bridge from a user
 'bridge_detach' # Signal a bridge is detaching from the bridge manager

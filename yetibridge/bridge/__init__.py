@@ -17,12 +17,18 @@ class BaseBridge:
             "this '%s' is not registered!" % self.__class__
 
         self._hook('on_deregister')
+        self.detach()
+
+    def detach(self):
         self.send_event('bridge_detach')
         del self._manager
 
     @property
     def is_registered(self):
         return hasattr(self, "_manager")
+
+    def ev_shutdown(self, event):
+        self.detach()
 
     def terminate(self):
         self._hook('on_terminate')
