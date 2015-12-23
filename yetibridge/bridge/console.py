@@ -2,7 +2,7 @@ import threading
 
 from . import BaseBridge
 from ..event import Target
-from ..cmdsys import split
+from ..cmdsys import split, command, is_command
 
 target_names = {
     id(Target.Everything): "Everything",
@@ -29,7 +29,29 @@ class ConsoleBridge(BaseBridge):
             except ValueError as e:
                 print('error: {}'.format(e))
             else:
-                self.send_event(Target.Manager, 'command', words, 'console')
+                if not len(words):
+                    continue
+
+                func = getattr(self, words[0], None)
+                if is_command(func):
+                    try:
+                        func(*words[1:])
+                    except Exception as e:
+                        print("{}: {}".format(e.__class__.__name__, e))
+                else:
+                    print("error: '{}' unknown command".format(words[0]))
+
+    @command
+    def bridge(self, *words):
+        self.send_event(Target.Manager, 'command', words, 'console')
+
+    @command
+    def manager(self, *words):
+        self.bridge(*(['manager']+list(words)))
+
+    @command
+    def shutdown(self):
+        self.manager('shutdown')
 
     def name(self, item_id):
         if item_id in target_names:
