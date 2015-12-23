@@ -45,7 +45,7 @@ class BridgeManager(Manager):
             if id(bridge) == bridge_id:
                 return name
         else:
-            raise ValueError("no bridge with id %s is attached" % bridge_id)
+            raise KeyError("no bridge with id %s is attached" % bridge_id)
 
     def _ev_user_join(self, event, user_id, nick):
         self._users[user_id] = {'bridge': event.bridge_id, 'nick': nick}

@@ -31,7 +31,7 @@ class ConsoleBridge(BaseBridge):
 
         try:
             return self._manager._bridge_name(item_id)
-        except ValueError:
+        except KeyError:
             pass
 
         return str(item_id)
