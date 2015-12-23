@@ -1,11 +1,7 @@
 import queue
 import collections
 
-from .parse import split
-
-def _command(function):
-    function.is_command = True
-    return function
+from .cmdsys import split, command, is_command
 
 class BridgeManager:
     def __init__(self, config):
@@ -88,7 +84,7 @@ class BridgeManager:
             return
 
         handler = getattr(self, '_{}'.format(command[0]), None)
-        if getattr(handler, "is_command", False):
+        if is_command(handler):
             try:
                 response = handler(*command[1:])
             except Exception as e:
@@ -141,7 +137,7 @@ class BridgeManager:
             if bridge is not self:
                 bridge.terminate()
 
-    @_command
+    @command
     def _shutdown(self):
         self._send_event('shutdown')
 
