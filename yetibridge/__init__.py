@@ -1,7 +1,7 @@
 import queue
 import collections
 
-from .cmdsys import split, command, is_command
+from .cmdsys import command, is_command
 
 class BridgeManager:
     def __init__(self, config):
@@ -55,13 +55,7 @@ class BridgeManager:
     def _ev_user_leave(self, bridge_id, user_id):
         del self._users[user_id]
 
-    def _tr_bridge_command(self, event, string, authority):
-        try:
-            words = split(string)
-        except ValueError as e:
-            self._send_event('bridge_message', "error: {}".format(str(e)))
-            return False
-
+    def _tr_bridge_command(self, event, words, authority):
         if len(words) == 0:
             self._send_event('bridge_message', "error: empty command")
             return False

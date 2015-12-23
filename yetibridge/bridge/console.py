@@ -2,6 +2,7 @@ import threading
 
 from . import BaseBridge
 from .. import BaseEvent
+from ..cmdsys import split
 
 class ConsoleBridge(BaseBridge):
     def __init__(self, config):
@@ -14,8 +15,13 @@ class ConsoleBridge(BaseBridge):
 
     def run(self):
         while True:
-            command = input()
-            self.send_event('bridge_command', command, 'console')
+            string = input()
+            try:
+                words = split(string)
+            except ValueError as e:
+                print('error: {}'.format(e))
+            else:
+                self.send_event('bridge_command', words, 'console')
 
     def name(self, item_id):
         try:
