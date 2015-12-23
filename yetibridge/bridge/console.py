@@ -12,6 +12,7 @@ class ConsoleBridge(BaseBridge):
 
     def on_register(self):
         self._thread.start()
+        self._manager._eavesdropper = self.on_eavesdrop
 
     def run(self):
         while True:
@@ -35,6 +36,11 @@ class ConsoleBridge(BaseBridge):
             pass
 
         return str(item_id)
+
+    def on_eavesdrop(self, event):
+        print("{} -> {}: {} (*{}, **{})"
+              "".format(self.name(event.source_id), self.name(event.target_id),
+                        event.name, event.args, event.kwargs))
 
     def ev_user_join(self, event, user_id, name):
         self.users[user_id] = name

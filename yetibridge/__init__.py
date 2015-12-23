@@ -11,6 +11,7 @@ class BridgeManager(Manager):
         self.events = queue.Queue()
         self._bridges = {"manager": self}
         self._users = {}
+        self._eavesdropper = None
 
     def attach(self, name, bridge):
         assert name not in self._bridges, \
@@ -111,6 +112,9 @@ class BridgeManager(Manager):
     def once(self):
         event = self.events.get()
         if self._translate(event):
+            if self._eavesdropper is not None:
+                self._eavesdropper(event)
+
             if event.is_target(Target.AllUsers):
                 test = lambda b: b is not self
             else:
