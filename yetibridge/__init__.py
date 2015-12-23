@@ -3,6 +3,7 @@ import collections
 
 from .cmdsys import command, is_command
 from .mixin import Manager
+from .event import Event, Target
 
 class BridgeManager(Manager):
     def __init__(self, config):
@@ -16,7 +17,7 @@ class BridgeManager(Manager):
             "bridge '%s' is already attached!" % name
 
         for user_id, user in self._users.items():
-            event = BaseEvent(id(self), 'user_joined', user_id, user['nick'])
+            event = Event(self, bridge, 'user_join', user_id, user['nick'])
             bridge._dispatch(event)
 
         self._bridges[name] = bridge
@@ -26,14 +27,15 @@ class BridgeManager(Manager):
         assert name in self._bridges, "bridge '%s' is not attached!" % name
         self._bridges[name].deregister()
 
-    def _tr_bridge_detach(self, event):
-        name = self._bridge_name(event.bridge_id)
+    def _tr_detach(self, event):
+        name = self._bridge_name(event.source_id)
         for user_id, user in self._users.items():
-            if user['bridge'] == event.bridge_id:
-                event = BaseEvent(event.bridge_id, 'user_left', user_id)
+            if user['bridge'] == event.source_id:
+                event = Event(event.source_id, Target.AllBridges, 'user_left',
+                              user_id)
                 self.events.put(event)
             else:
-                event = BaseEvent(id(self), 'user_left', user_id)
+                event = Event(self, event.source_id, 'user_left', user_id)
                 self._bridges[name]._dispatch(event)
 
         del self._bridges[name]
@@ -48,34 +50,33 @@ class BridgeManager(Manager):
             raise KeyError("no bridge with id %s is attached" % bridge_id)
 
     def _ev_user_join(self, event, user_id, nick):
-        self._users[user_id] = {'bridge': event.bridge_id, 'nick': nick}
+        self._users[user_id] = {'bridge': event.source_id, 'nick': nick}
 
     def _ev_user_update(self, event, user_id, nick):
-        self._users[user_id] = {'bridge': event.bridge_id, 'nick': nick}
+        self._users[user_id] = {'bridge': event.source_id, 'nick': nick}
 
-    def _ev_user_leave(self, bridge_id, user_id):
+    def _ev_user_leave(self, event, user_id):
         del self._users[user_id]
 
-    def _tr_bridge_command(self, event, words, authority):
+    def _tr_command(self, event, words, authority):
         if len(words) == 0:
-            self._send_event('bridge_message', "error: empty command")
+            self._send_event(event.source_id, 'message',
+                             "error: empty command")
             return False
 
-        if words[0] not in self._bridges:
-            self._send_event('bridge_message',
+        elif words[0] not in self._bridges:
+            self._send_event(event.source_id, 'message',
                              "error: '{}' no such bridge".format(words[0]))
             return False
 
-        target = id(self._bridges[words[0]])
-        event.args = [target, words[1:], authority]
+        event.target_id = id(self._bridges[words[0]])
+        event.args = [words[1:], authority]
         return True
 
-    def _ev_bridge_command(self, event, target, command, authority):
-        if target != id(self):
-            return
-
+    def _ev_command(self, event, command, authority):
         if len(command) == 0:
-            self._send_event('bridge_message', "error: empty command")
+            self._send_event(event.source_id, 'message',
+                             "error: empty command")
             return
 
         handler = getattr(self, '_{}'.format(command[0]), None)
@@ -83,18 +84,17 @@ class BridgeManager(Manager):
             try:
                 response = handler(*command[1:])
             except Exception as e:
-                self._send_event('bridge_message', "error: {}".format(e))
-                return
-
-            if response is not None:
-                self._send_event('bridge_message', response)
+                self._send_event(event.source_id, 'message',
+                                 "error: {}".format(e))
+            else:
+                if response is not None:
+                    self._send_event(event.source_id, 'message', response)
         else:
-            self._send_event('bridge_message',
-                             "error: '{}' unkown command".format(command[0]))
+            self._send_event(event.source_id, 'message', "error: '{}' "
+                             "unkown command".format(command[0]))
 
-    def _send_event(self, name, *args, **kwargs):
-        event = BaseEvent(id(self), name, *args, **kwargs)
-        self.events.put(event)
+    def _send_event(self, target, name, *args, **kwargs):
+        self.events.put(Event(self, target, name, *args, **kwargs))
 
     def _dispatch(self, event):
         handler = getattr(self, '_ev_{}'.format(event.name), None)
@@ -111,7 +111,17 @@ class BridgeManager(Manager):
     def once(self):
         event = self.events.get()
         if self._translate(event):
-            for bridge in self._bridges.values():
+            if event.is_target(Target.AllUsers):
+                test = lambda b: b is not self
+            else:
+                test = lambda b: event.is_target(b)
+
+            bridges = [b for b in self._bridges.values() if test(b)]
+            if not len(bridges):
+                bridge_id = self._users[event.target_id]['bridge']
+                bridges = (self._bridges[self._bridge_name(bridge_id)],)
+
+            for bridge in bridges:
                 bridge._dispatch(event)
 
     def run(self):
@@ -134,28 +144,4 @@ class BridgeManager(Manager):
 
     @command
     def _shutdown(self):
-        self._send_event('shutdown')
-
-class BaseEvent:
-    def __init__(self, bridge_id, name, *args, **kwargs):
-        self.bridge_id = bridge_id
-        self.name = name
-        self.args = args
-        self.kwargs = kwargs
-
-    def __str__(self):
-        return 'Event({}, {}, *{}, **{})'.format(self.bridge_id, self.name,
-                                                 self.args, self.kwargs)
-
-# Some events
-'user_join' # A user has joined in a bridged chat
-'user_update' # User details has been updated in a bridged chat
-'user_leave' # A user has left a bridged chat
-'channel_message' # Message recieved from a bridged chat
-'channel_command' # Command recieved from a bridged chat
-'private_message' # Message to a user across the bridge
-'bridge_broadcast' # Broadcast across the bridge
-'shutdown' # Global shutdown event, all brides are expected to detach
-'bridge_message' # Message to the bridge from a user
-'bridge_command' # Command to the bridge from a user
-'bridge_detach' # Signal a bridge is detaching from the bridge manager
+        self._send_event(Target.AllBridges, 'shutdown')

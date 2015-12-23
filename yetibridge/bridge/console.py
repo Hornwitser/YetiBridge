@@ -1,7 +1,7 @@
 import threading
 
 from . import BaseBridge
-from .. import BaseEvent
+from ..event import Target
 from ..cmdsys import split
 
 class ConsoleBridge(BaseBridge):
@@ -21,7 +21,7 @@ class ConsoleBridge(BaseBridge):
             except ValueError as e:
                 print('error: {}'.format(e))
             else:
-                self.send_event('bridge_command', words, 'console')
+                self.send_event(Target.Manager, 'command', words, 'console')
 
     def name(self, item_id):
         try:
@@ -38,20 +38,21 @@ class ConsoleBridge(BaseBridge):
 
     def ev_user_join(self, event, user_id, name):
         self.users[user_id] = name
-        print("{}: user '{}' joined".format(self.name(event.bridge_id), name))
+        print("{}: user '{}' joined".format(self.name(event.source_id), name))
 
     def ev_user_update(self, event, user_id, name):
         self.users[user_id] = name
         print("{}: user '{}' updated".format(bridge_name, name))
 
     def ev_user_leave(self, event, user_id):
-        print("{}: user '{}' left".format(self.name(event.bridge_id),
+        print("{}: user '{}' left".format(self.name(event.source_id),
                                           self.users[user_id]))
         del self.users[user_id]
 
-    def ev_bridge_message(self, event, content):
-        print("{}: {}".format(self.name(event.bridge_id), content))
+    def ev_message(self, event, content):
+        print("{}: {}".format(self.name(event.source_id), content))
 
-    def ev_bridge_command(self, event, target, command, authority):
-        print("{} -> {}: command {}".format(self.name(event.bridge_id),
-                                            self.name(target), command))
+    def ev_command(self, event, command, authority):
+        print("{} -> {}: command {}"
+              "".format(self.name(event.source_id),
+                        self.name(event.target_id), command))
