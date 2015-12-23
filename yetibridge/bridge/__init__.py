@@ -1,6 +1,7 @@
 from .. import BaseEvent
+from ..mixin import Bridge
 
-class BaseBridge:
+class BaseBridge(Bridge):
     def __init__(self, config):
         self.config = config
         self.imposters = {}

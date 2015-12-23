@@ -2,8 +2,9 @@ import queue
 import collections
 
 from .cmdsys import command, is_command
+from .mixin import Manager
 
-class BridgeManager:
+class BridgeManager(Manager):
     def __init__(self, config):
         self.config = config
         self.events = queue.Queue()
