@@ -4,6 +4,13 @@ from . import BaseBridge
 from ..event import Target
 from ..cmdsys import split
 
+target_names = {
+    id(Target.Everything): "Everything",
+    id(Target.Manager): "Manager",
+    id(Target.AllBridges): "AllBridges",
+    id(Target.AllUsers): "AllUsers",
+}
+
 class ConsoleBridge(BaseBridge):
     def __init__(self, config):
         BaseBridge.__init__(self, config)
@@ -25,14 +32,15 @@ class ConsoleBridge(BaseBridge):
                 self.send_event(Target.Manager, 'command', words, 'console')
 
     def name(self, item_id):
-        try:
+        if item_id in target_names:
+            return target_names[item_id]
+
+        if item_id in self.users:
             return self.users[item_id]
-        except KeyError:
-            pass
 
         try:
             return self._manager._bridge_name(item_id)
-        except KeyError:
+        except (KeyError, AttributeError):
             pass
 
         return str(item_id)
