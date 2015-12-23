@@ -42,6 +42,7 @@ class Event:
 'user_leave' # A user has left a bridged chat
 'message' # Message recieved from a bridged chat or a user
 'command' # Command recieved from a bridged chat or a user
+'exception' # Propogate an exception
 'shutdown' # Global shutdown event, all brides are expected to detach
 'broadcast' # Broadcast across the bridge
 'detach' # Signals a bridge is detaching from the bridge manager

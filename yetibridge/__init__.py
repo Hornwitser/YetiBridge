@@ -94,6 +94,9 @@ class BridgeManager(Manager):
             self._send_event(event.source_id, 'message', "error: '{}' "
                              "unkown command".format(command[0]))
 
+    def _ev_exception(self, event, exception):
+        raise exception
+
     def _send_event(self, target, name, *args, **kwargs):
         self.events.put(Event(self, target, name, *args, **kwargs))
 
