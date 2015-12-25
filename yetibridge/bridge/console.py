@@ -71,24 +71,3 @@ class ConsoleBridge(BaseBridge):
         print("{} -> {}: {} (*{}, **{})"
               "".format(self.name(event.source_id), self.name(event.target_id),
                         event.name, event.args, event.kwargs))
-
-    def ev_user_join(self, event, user_id, name):
-        self.users[user_id] = name
-        print("{}: user '{}' joined".format(self.name(event.source_id), name))
-
-    def ev_user_update(self, event, user_id, name):
-        self.users[user_id] = name
-        print("{}: user '{}' updated".format(bridge_name, name))
-
-    def ev_user_leave(self, event, user_id):
-        print("{}: user '{}' left".format(self.name(event.source_id),
-                                          self.users[user_id]))
-        del self.users[user_id]
-
-    def ev_message(self, event, content):
-        print("{}: {}".format(self.name(event.source_id), content))
-
-    def ev_command(self, event, command, authority):
-        print("{} -> {}: command {}"
-              "".format(self.name(event.source_id),
-                        self.name(event.target_id), command))
