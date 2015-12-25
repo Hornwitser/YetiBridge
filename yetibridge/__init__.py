@@ -118,15 +118,34 @@ class BridgeManager(Manager):
             if self._eavesdropper is not None:
                 self._eavesdropper(event)
 
-            if event.is_target(Target.AllUsers):
-                test = lambda b: b is not self
-            else:
-                test = lambda b: event.is_target(b)
+            if event.is_target(Target.Everything):
+                bridges = self._bridges.values()
 
-            bridges = [b for b in self._bridges.values() if test(b)]
-            if not len(bridges):
-                bridge_id = self._users[event.target_id]['bridge']
-                bridges = (self._bridges[self._bridge_name(bridge_id)],)
+            elif event.is_target(Target.Manager):
+                bridges = (self,)
+
+            elif event.is_target(Target.AllBridges):
+                bridges = (b for b in self._bridges.values() if b is not self)
+
+            elif event.is_target(Target.AllUsers):
+                bridge_ids = {u['bridge'] for u in self._users}
+                bridges = (b for b in self._bridges.values()
+                               if id(b) in bridge_ids)
+
+            else:
+                for bridge in self._bridges.values():
+                    if id(bridge) == event.target_id:
+                        bridges = (bridge,)
+                        break
+
+                else:
+                    for user_id, user in self._users.items():
+                        if user_id == event.target_id:
+                            bridges = (user['bridge'],)
+                            break
+
+                    else:
+                        raise ValueError("invalid target")
 
             for bridge in bridges:
                 bridge._dispatch(event)
