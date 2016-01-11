@@ -8,7 +8,37 @@ class ConsoleBridge(BaseBridge):
     def __init__(self, config):
         BaseBridge.__init__(self, config)
         self._thread = threading.Thread(target=self.run, daemon=True)
-        self.users = {}
+        self.channels = {}
+
+    def ev_channel_add(self, event, channel_id, name, users):
+        print('joined #{}'.format(name))
+
+        self.channels[channel_id] = {'name': name, 'users': users}
+
+    def ev_channel_remove(self, event, channel_id):
+        print('left #{}'.format(self.channels[channel_id]['name']))
+
+        del self.channels[channel_id]
+
+    def ev_user_add(self, event, user_id, name):
+        self.channels[event.target_id]['users'][user_id] = {'name': name}
+
+        channel_name = self.channels[event.target_id]['name']
+        print('#{}: {} joined'.format(channel_name, name))
+
+    def ev_user_update(self, event, user_id, name):
+        old_name = self.channels[event.target_id]['users'][user_id]['name']
+        channel_name = self.channels[event.target_id]['name']
+        print('#{}: {} -> {}'.format(channel_name, old_name, name))
+
+        self.channels[event.target_id]['users'][user_id]['name'] = name
+
+    def ev_user_remove(self, event, user_id):
+        name = self.channels[event.target_id]['users'][user_id]['name']
+        channel_name = self.channels[event.target_id]['name']
+        print('#{}: {} left'.format(channel_name, old_name, name))
+
+        del self.channels[event.target_id]['users'][user_id]
 
     def on_register(self):
         self._thread.start()
@@ -46,6 +76,14 @@ class ConsoleBridge(BaseBridge):
     def shutdown(self):
         self.manager('shutdown')
 
+    @command
+    def join(self, channel):
+        self.send_event(self, Target.Manager, 'channel_join', channel)
+
+    @command
+    def leave(self, channel):
+        self.send_event(self, Target.Manager, 'channel_leave', channel)
+
     target_names = {
         id(Target.Everything): "Everything",
         id(Target.Manager): "Manager",
@@ -58,13 +96,22 @@ class ConsoleBridge(BaseBridge):
         if item_id in self.target_names:
             return self.target_names[item_id]
 
-        if item_id in self.users:
-            return self.users[item_id]
+        if item_id in self.channels:
+            return '#{}'.format(self.channels[item_id]['name'])
 
         try:
             return self._manager._bridge_name(item_id)
         except (KeyError, AttributeError):
             pass
+
+        try:
+            return '#{}'.format(self._manager._channel_name(item_id))
+        except (KeyError, AttributeError):
+            pass
+
+        for channel in self.channels.values():
+            if item_id in channel['users']:
+                return channel['users'][item_id]['name']
 
         return str(item_id)
 
