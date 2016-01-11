@@ -77,6 +77,15 @@ class ConsoleBridge(BaseBridge):
         self.manager('shutdown')
 
     @command
+    def debug(self, *code):
+        try:
+            result = eval(' '.join(code))
+        except Exception as e:
+            print("{}: {}".format(e.__class__.__name__, e))
+        else:
+            print(repr(result))
+
+    @command
     def join(self, channel):
         self.send_event(self, Target.Manager, 'channel_join', channel)
 
