@@ -21,7 +21,7 @@ class BaseBridge(Bridge):
         self.detach()
 
     def detach(self):
-        self.send_event(Target.Manager, 'detach')
+        self.send_event(self, Target.Manager, 'detach')
         del self._manager
 
     @property
@@ -45,7 +45,7 @@ class BaseBridge(Bridge):
         if handler is not None:
             handler(event, *event.args, **event.kwargs)
 
-    def send_event(self, target, name, *args, **kwargs):
+    def send_event(self, source, target, name, *args, **kwargs):
         assert self.is_registered, \
             "this '%s' is not registered!" % self.__class__
-        self._manager.events.put(Event(self, target, name, *args, **kwargs))
+        self._manager.events.put(Event(source, target, name, *args, **kwargs))

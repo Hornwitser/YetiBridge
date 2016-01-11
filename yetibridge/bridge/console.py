@@ -43,7 +43,7 @@ class ConsoleBridge(BaseBridge):
 
     @command
     def bridge(self, *words):
-        self.send_event(Target.Manager, 'command', words, 'console')
+        self.send_event(self, Target.Manager, 'command', words, 'console')
 
     @command
     def manager(self, *words):
