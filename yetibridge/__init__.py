@@ -2,24 +2,55 @@ import queue
 import collections
 
 from .cmdsys import command, is_command
-from .mixin import Manager
+from .mixin import Manager, Channel
 from .event import Event, Target
+
+class BridgeChannel(Channel):
+    def __init__(self, manager):
+        self._manager = manager
+        self.bridges = set()
+        self.users = {}
+
+    def _bridge_join(self, bridge_id):
+        if bridge_id in self.bridges:
+            raise ValueError("bridge already joined")
+
+        self.bridges.add(bridge_id)
+
+    def _bridge_leave(self, bridge_id):
+        bridge_users = [(i, u) for i, u in self.users.items()
+                            if u['bridge_id'] == bridge_id]
+
+        for user_id, user in bridge_users:
+            event = Event(self, self._manager, 'user_leave', id(self), user_id)
+            self._manager.events.put(event)
+            del self.users[user_id]
+
+        self.bridges.remove(bridge_id)
+
+    def _user_join(self, user_id, name, bridge_id):
+        if user_id in self.users:
+            raise ValueError("user already joined")
+
+        self.users[user_id] = {"name": name, "bridge_id": bridge_id}
+
+    def _user_update(self, user_id, name):
+        self.users[user_id]["name"] = name
+
+    def _user_leave(self, user_id):
+        del self.users[user_id]
 
 class BridgeManager(Manager):
     def __init__(self, config):
         self.config = config
         self.events = queue.Queue()
         self._bridges = {"manager": self}
-        self._users = {}
+        self._channels = {}
         self._eavesdropper = None
 
     def attach(self, name, bridge):
         assert name not in self._bridges, \
             "bridge '%s' is already attached!" % name
-
-        for user_id, user in self._users.items():
-            event = Event(self, bridge, 'user_join', user_id, user['nick'])
-            bridge._dispatch(event)
 
         self._bridges[name] = bridge
         bridge.register(self)
@@ -30,14 +61,16 @@ class BridgeManager(Manager):
 
     def _tr_detach(self, event):
         name = self._bridge_name(event.source_id)
-        for user_id, user in self._users.items():
-            if user['bridge'] == event.source_id:
-                event = Event(event.source_id, Target.AllBridges, 'user_left',
-                              user_id)
-                self.events.put(event)
-            else:
-                event = Event(self, event.source_id, 'user_left', user_id)
-                self._bridges[name]._dispatch(event)
+
+        turned_empty = []
+        for channel_name, channel in self._channels.items():
+            if event.source_id in channel.bridges:
+                channel._bridge_leave(event.source_id)
+                if not len(channel.bridges):
+                    turned_empty.append(channel_name)
+
+        for channel_name in turned_empty:
+            del self._channels[channel_name]
 
         del self._bridges[name]
         self._running = len(self._bridges) > 1
@@ -50,14 +83,48 @@ class BridgeManager(Manager):
         else:
             raise KeyError("no bridge with id %s is attached" % bridge_id)
 
-    def _ev_user_join(self, event, user_id, nick):
-        self._users[user_id] = {'bridge': event.source_id, 'nick': nick}
+    def _channel_name(self, channel_id):
+        for name, channel in self._channels.items():
+            if id(channel) == channel_id:
+                return name
+        else:
+            raise KeyError("no channel with id %s is attached" % channel_id)
 
-    def _ev_user_update(self, event, user_id, nick):
-        self._users[user_id] = {'bridge': event.source_id, 'nick': nick}
+    def _ev_channel_join(self, event, name):
+        try:
+            channel = self._channels[name]
+        except KeyError:
+            channel = self._channels[name] = BridgeChannel(self)
 
-    def _ev_user_leave(self, event, user_id):
-        del self._users[user_id]
+        bridge_id, users = event.source_id, channel.users
+        self._send_event(bridge_id, 'channel_add', id(channel), name, users)
+        channel._bridge_join(bridge_id)
+
+    def _ev_channel_leave(self, event, name):
+        self._channels[name]._bridge_leave(event.source_id)
+        channel = self._channels[name]
+        self._send_event(event.source_id, 'channel_remove', id(channel))
+
+        if not len(self._channels[name].bridges):
+            del self._channels[name]
+
+    def _ev_user_join(self, event, channel_id, user_id, name):
+        channel_name = self._channel_name(channel_id)
+
+        self._send_event(channel_id, 'user_add', user_id, name)
+        self._channels[channel_name]._user_join(user_id, name, event.source_id)
+
+    def _ev_user_change(self, event, channel_id, user_id, name):
+        channel_name = self._channel_name(channel_id)
+
+        self._send_event(channel_id, 'user_update', user_id, name)
+        self._channels[channel_name]._user_update(user_id, name)
+
+    def _ev_user_leave(self, event, channel_id, user_id):
+        channel_name = self._channel_name(channel_id)
+
+        self._channels[channel_name]._user_leave(user_id)
+        self._send_event(channel_id, 'user_remove', user_id)
 
     def _tr_command(self, event, words, authority):
         if len(words) == 0:
@@ -127,8 +194,14 @@ class BridgeManager(Manager):
             elif event.is_target(Target.AllBridges):
                 bridges = (b for b in self._bridges.values() if b is not self)
 
+            elif event.is_target(Target.AllChannels):
+                bridge_ids = {i for c in self._channels for i in c.bridges}
+                bridges = (b for b in self._bridges.values()
+                               if id(b) in bridge_ids)
+
             elif event.is_target(Target.AllUsers):
-                bridge_ids = {u['bridge'] for u in self._users}
+                users = (u for c in self._channels for u in c.users)
+                bridge_ids = {u['bridge_id'] for u in users}
                 bridges = (b for b in self._bridges.values()
                                if id(b) in bridge_ids)
 
@@ -139,11 +212,17 @@ class BridgeManager(Manager):
                         break
 
                 else:
-                    for user_id, user in self._users.items():
-                        if user_id == event.target_id:
-                            bridges = (user['bridge'],)
+                    for channel in self._channels.values():
+                        if id(channel) == event.target_id:
+                            bridges = (b for b in self._bridges.values()
+                                           if id(b) in channel.bridges)
                             break
 
+                        elif event.target_id in channel.users:
+                            bridge_id = channel.users[event.target_id]
+                            bridges = (b for b in self._bridges.values()
+                                           if id(b) == bridge_id)
+                            break
                     else:
                         raise ValueError("invalid target")
 

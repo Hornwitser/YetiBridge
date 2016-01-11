@@ -5,5 +5,8 @@ class Bridge:
 class Manager:
     pass
 
+class Channel:
+    pass
+
 class User:
     pass

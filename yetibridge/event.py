@@ -1,4 +1,4 @@
-from .mixin import Manager, Bridge, User
+from .mixin import Manager, Bridge, Channel, User
 
 class _TargetType:
     pass
@@ -7,6 +7,7 @@ class Target:
     Everything = _TargetType()
     Manager = _TargetType()
     AllBridges = _TargetType()
+    AllChannels = _TargetType()
     AllUsers = _TargetType()
 
 class Event:
@@ -26,6 +27,8 @@ class Event:
             return isinstance(target, Manager)
         elif self.target_id == id(Target.AllBridges):
             return isinstance(target, Bridge)
+        elif self.target_id == id(Target.AllChannels):
+            return isinstance(target, Channel)
         elif self.target_id == id(Target.AllUsers):
             return isinstance(target, User)
         else:
@@ -37,9 +40,11 @@ class Event:
                           self.name, self.args, self.kwargs))
 
 # Some events
-'user_join' # A user has joined in a bridged chat
-'user_update' # User details has been updated in a bridged chat
-'user_leave' # A user has left a bridged chat
+'user_add' # A user has joined in a channel
+'user_update' # User details has been updated in a channel
+'user_remove' # A user has left a channel
+'user_join' # A user is joining a channel
+'user_leave' # A user is leaving a channel
 'message' # Message recieved from a bridged chat or a user
 'command' # Command recieved from a bridged chat or a user
 'exception' # Propogate an exception
