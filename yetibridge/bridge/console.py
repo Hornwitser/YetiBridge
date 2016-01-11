@@ -4,13 +4,6 @@ from . import BaseBridge
 from ..event import Target
 from ..cmdsys import split, command, is_command
 
-target_names = {
-    id(Target.Everything): "Everything",
-    id(Target.Manager): "Manager",
-    id(Target.AllBridges): "AllBridges",
-    id(Target.AllUsers): "AllUsers",
-}
-
 class ConsoleBridge(BaseBridge):
     def __init__(self, config):
         BaseBridge.__init__(self, config)
@@ -53,9 +46,17 @@ class ConsoleBridge(BaseBridge):
     def shutdown(self):
         self.manager('shutdown')
 
+    target_names = {
+        id(Target.Everything): "Everything",
+        id(Target.Manager): "Manager",
+        id(Target.AllBridges): "AllBridges",
+        id(Target.AllChannels): "AllChannels",
+        id(Target.AllUsers): "AllUsers",
+    }
+
     def name(self, item_id):
-        if item_id in target_names:
-            return target_names[item_id]
+        if item_id in self.target_names:
+            return self.target_names[item_id]
 
         if item_id in self.users:
             return self.users[item_id]
