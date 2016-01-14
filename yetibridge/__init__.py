@@ -24,7 +24,6 @@ class BridgeChannel(Channel):
         for user_id, user in bridge_users:
             event = Event(self, self._manager, 'user_leave', id(self), user_id)
             self._manager.events.put(event)
-            del self.users[user_id]
 
         self.bridges.remove(bridge_id)
 
