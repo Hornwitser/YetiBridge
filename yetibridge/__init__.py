@@ -218,9 +218,9 @@ class BridgeManager(Manager):
                             break
 
                         elif event.target_id in channel.users:
-                            bridge_id = channel.users[event.target_id]
+                            user = channel.users[event.target_id]
                             bridges = (b for b in self._bridges.values()
-                                           if id(b) == bridge_id)
+                                           if id(b) == user['bridge_id'])
                             break
                     else:
                         raise ValueError("invalid target")
