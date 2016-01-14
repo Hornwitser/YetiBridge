@@ -102,6 +102,9 @@ class ConsoleBridge(BaseBridge):
     }
 
     def name(self, item_id):
+        if type(item_id) is not int:
+            return repr(item_id)
+
         if item_id in self.target_names:
             return self.target_names[item_id]
 
@@ -125,6 +128,9 @@ class ConsoleBridge(BaseBridge):
         return str(item_id)
 
     def on_eavesdrop(self, event):
-        print("{} -> {}: {} (*{}, **{})"
+        args = map(self.name, event.args)
+        kwargs = ('{}={}'.format(k, repr(v)) for k, v in event.kwargs.items())
+        params = (p for i in (args, kwargs) for p in i)
+        print("{} -> {}: {}({})"
               "".format(self.name(event.source_id), self.name(event.target_id),
-                        event.name, event.args, event.kwargs))
+                        event.name, ', '.join(params)))
