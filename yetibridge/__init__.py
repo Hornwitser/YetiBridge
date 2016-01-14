@@ -95,7 +95,7 @@ class BridgeManager(Manager):
         except KeyError:
             channel = self._channels[name] = BridgeChannel(self)
 
-        bridge_id, users = event.source_id, channel.users
+        bridge_id, users = event.source_id, channel.users.copy()
         self._send_event(bridge_id, 'channel_add', id(channel), name, users)
         channel._bridge_join(bridge_id)
 
