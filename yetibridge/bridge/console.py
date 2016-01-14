@@ -86,12 +86,12 @@ class ConsoleBridge(BaseBridge):
             print(repr(result))
 
     @command
-    def join(self, channel):
-        self.send_event(self, Target.Manager, 'channel_join', channel)
+    def join(self, channel_name):
+        self.send_event(self, Target.Manager, 'channel_join', channel_name)
 
     @command
-    def leave(self, channel):
-        self.send_event(self, Target.Manager, 'channel_leave', channel)
+    def leave(self, channel_name):
+        self.send_event(self, Target.Manager, 'channel_leave', channel_name)
 
     target_names = {
         id(Target.Everything): "Everything",
