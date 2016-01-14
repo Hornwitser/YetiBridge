@@ -50,7 +50,6 @@ class BaseBridge:
     def __init__(self, config):
         self.config = config
         self.channels = {}
-        self.channel_map = {}
 
     def register(self, manager):
         assert not self.is_registered, \
@@ -76,12 +75,10 @@ class BaseBridge:
 
     def ev_channel_add(self, event, channel_id, name, users):
         self.channels[channel_id] = channel = Channel(channel_id, name, users)
-        self.channel_map[name] = channel_id
         self._hook('on_channel_add', channel)
 
     def ev_channel_remove(self, event, channel_id):
         channel = self.channels[channel_id]
-        del self.chanel_map[channel.name]
         del self.channels[channel_id]
         self._hook('on_channel_remove', channel)
 
