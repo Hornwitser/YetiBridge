@@ -184,21 +184,21 @@ class BridgeManager(Manager):
             if self._eavesdropper is not None:
                 self._eavesdropper(event)
 
-            if event.is_target(Target.Everything):
+            if event.target_id == Target.Everything:
                 bridges = self._bridges.values()
 
-            elif event.is_target(Target.Manager):
+            elif event.target_id == Target.Manager:
                 bridges = (self,)
 
-            elif event.is_target(Target.AllBridges):
+            elif event.target_id == Target.AllBridges:
                 bridges = (b for b in self._bridges.values() if b is not self)
 
-            elif event.is_target(Target.AllChannels):
+            elif event.target_id == Target.AllChannels:
                 bridge_ids = {i for c in self._channels for i in c.bridges}
                 bridges = (b for b in self._bridges.values()
                                if id(b) in bridge_ids)
 
-            elif event.is_target(Target.AllUsers):
+            elif event.target_id == Target.AllUsers:
                 users = (u for c in self._channels for u in c.users)
                 bridge_ids = {u['bridge_id'] for u in users}
                 bridges = (b for b in self._bridges.values()

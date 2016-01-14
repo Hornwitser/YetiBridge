@@ -1,7 +1,13 @@
 from .mixin import Manager, Bridge, Channel, User
 
 class _TargetType:
-    pass
+    def __eq__(self, other):
+        if isinstance(other, _TargetType):
+            return self is other
+        elif isinstance(other, int):
+            return id(self) == other
+        else:
+            return NotImplemented
 
 class Target:
     Everything = _TargetType()
@@ -17,22 +23,6 @@ class Event:
         self.name = name
         self.args = args
         self.kwargs = kwargs
-
-    def is_target(self, target):
-        if isinstance(target, _TargetType):
-            return self.target_id == id(target)
-        elif self.target_id == id(Target.Everything):
-            return True
-        elif self.target_id == id(Target.Manager):
-            return isinstance(target, Manager)
-        elif self.target_id == id(Target.AllBridges):
-            return isinstance(target, Bridge)
-        elif self.target_id == id(Target.AllChannels):
-            return isinstance(target, Channel)
-        elif self.target_id == id(Target.AllUsers):
-            return isinstance(target, User)
-        else:
-            return self.target_id == id(target)
 
     def __str__(self):
         return ('Event({}, {}, {}, *{}, **{})'
