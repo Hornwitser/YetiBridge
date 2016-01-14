@@ -14,6 +14,9 @@ class ConsoleBridge(BaseBridge):
         self._thread.start()
         self._manager._eavesdropper = self.on_eavesdrop
 
+        for channel_name in self.config['channels']:
+            self.join(channel_name)
+
     def on_channel_add(self, channel):
         print('joined #{}'.format(channel.name))
 
