@@ -1,9 +1,56 @@
 from ..event import Event, Target
 
+class Channel:
+    __slots__ = ('_id', '_name', '_users')
+
+    def __init__(self, id, name, users):
+        self._id = id
+        self._name = name
+        self._users = {}
+
+        for user_id, user in users:
+            self._users[user_id] = User(user_id, user['name'])
+
+    def copy(self):
+        return Channel(self._id, self._name, self._users.copy())
+
+    @property
+    def id(self):
+        return self._id
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def users(self):
+        return self._users.values()
+
+
+class User:
+    __slots__ = ('_id', '_name')
+
+    def __init__(self, id, name):
+        self._id = id
+        self._name = name
+
+    def copy(self):
+        return User(self._id, self._name)
+
+    @property
+    def id(self):
+        return self._id
+
+    @property
+    def name(self):
+        return self._name
+
+
 class BaseBridge:
     def __init__(self, config):
         self.config = config
-        self.imposters = {}
+        self.channels = {}
+        self.channel_map = {}
 
     def register(self, manager):
         assert not self.is_registered, \
@@ -26,6 +73,32 @@ class BaseBridge:
     @property
     def is_registered(self):
         return hasattr(self, "_manager")
+
+    def ev_channel_add(self, event, channel_id, name, users):
+        self.channels[channel_id] = channel = Channel(channel_id, name, users)
+        self.channel_map[name] = channel_id
+        self._hook('on_channel_add', channel)
+
+    def ev_channel_remove(self, event, channel_id):
+        channel = self.channels[channel_id]
+        del self.chanel_map[channel.name]
+        del self.channels[channel_id]
+        self._hook('on_channel_remove', channel)
+
+    def ev_user_add(self, event, user_id, name):
+        channel = self.channels[event.target_id]
+        channel._users[user_id] = user = User(user_id, name)
+        self._hook('on_user_add', channel, user)
+
+    def ev_user_update(self, event, user_id, name):
+        channel = self.channels[event.target_id]
+        after = channel._users[user_id]
+        before = after.copy()
+        after._name = name
+        self._hook('on_user_update', channel, before, after)
+
+    def ev_user_remove(self, event, user_id):
+        del self.channels[event.target_id]._users[user_id]
 
     def ev_shutdown(self, event):
         self.detach()

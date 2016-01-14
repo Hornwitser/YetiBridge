@@ -4,45 +4,30 @@ from . import BaseBridge
 from ..event import Target
 from ..cmdsys import split, command, is_command
 
+
 class ConsoleBridge(BaseBridge):
     def __init__(self, config):
         BaseBridge.__init__(self, config)
         self._thread = threading.Thread(target=self.run, daemon=True)
-        self.channels = {}
-
-    def ev_channel_add(self, event, channel_id, name, users):
-        print('joined #{}'.format(name))
-
-        self.channels[channel_id] = {'name': name, 'users': users}
-
-    def ev_channel_remove(self, event, channel_id):
-        print('left #{}'.format(self.channels[channel_id]['name']))
-
-        del self.channels[channel_id]
-
-    def ev_user_add(self, event, user_id, name):
-        self.channels[event.target_id]['users'][user_id] = {'name': name}
-
-        channel_name = self.channels[event.target_id]['name']
-        print('#{}: {} joined'.format(channel_name, name))
-
-    def ev_user_update(self, event, user_id, name):
-        old_name = self.channels[event.target_id]['users'][user_id]['name']
-        channel_name = self.channels[event.target_id]['name']
-        print('#{}: {} -> {}'.format(channel_name, old_name, name))
-
-        self.channels[event.target_id]['users'][user_id]['name'] = name
-
-    def ev_user_remove(self, event, user_id):
-        name = self.channels[event.target_id]['users'][user_id]['name']
-        channel_name = self.channels[event.target_id]['name']
-        print('#{}: {} left'.format(channel_name, old_name, name))
-
-        del self.channels[event.target_id]['users'][user_id]
 
     def on_register(self):
         self._thread.start()
         self._manager._eavesdropper = self.on_eavesdrop
+
+    def on_channel_add(self, channel):
+        print('joined #{}'.format(channel.name))
+
+    def on_channel_remove(self, channel):
+        print('left #{}'.format(channel.name))
+
+    def on_user_add(self, channel, user):
+        print('#{}: {} joined'.format(channel.name, user.name))
+
+    def on_user_update(self, channel, before, after):
+        print('#{}: {} -> {}'.format(channel.name, before.name, after.name))
+
+    def on_user_remove(self, channel, user):
+        print('#{}: {} left'.format(channel.name, user.name))
 
     def run(self):
         while True:
@@ -109,7 +94,7 @@ class ConsoleBridge(BaseBridge):
             return self.target_names[item_id]
 
         if item_id in self.channels:
-            return '#{}'.format(self.channels[item_id]['name'])
+            return '#{}'.format(self.channels[item_id].name)
 
         try:
             return self._manager._bridge_name(item_id)
@@ -122,8 +107,8 @@ class ConsoleBridge(BaseBridge):
             pass
 
         for channel in self.channels.values():
-            if item_id in channel['users']:
-                return channel['users'][item_id]['name']
+            if item_id in channel._users:
+                return channel._users[item_id].name
 
         return str(item_id)
 
