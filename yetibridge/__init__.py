@@ -2,10 +2,9 @@ import queue
 import collections
 
 from .cmdsys import command, is_command
-from .mixin import Manager, Channel
 from .event import Event, Target
 
-class BridgeChannel(Channel):
+class BridgeChannel:
     def __init__(self, manager):
         self._manager = manager
         self.bridges = set()
@@ -39,7 +38,7 @@ class BridgeChannel(Channel):
     def _user_leave(self, user_id):
         del self.users[user_id]
 
-class BridgeManager(Manager):
+class BridgeManager:
     def __init__(self, config):
         self.config = config
         self.events = queue.Queue()

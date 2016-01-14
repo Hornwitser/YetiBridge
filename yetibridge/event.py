@@ -1,5 +1,3 @@
-from .mixin import Manager, Bridge, Channel, User
-
 class _TargetType:
     def __eq__(self, other):
         if isinstance(other, _TargetType):
