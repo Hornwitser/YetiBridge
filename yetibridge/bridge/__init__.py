@@ -51,16 +51,20 @@ class BaseBridge:
         self.config = config
         self.channels = {}
 
+    def _assert_registered(self):
+        if not self.is_registered:
+            raise RuntimeError("this {} is not registered".format(type(self)))
+
     def register(self, manager):
-        assert not self.is_registered, \
-            "this '%s' is already registered!" % self.__class__
+        if self.is_registered:
+            raise RuntimeError("attempt to register already registered {}"
+                               "".format(type(self)))
 
         self._manager = manager
         self._hook('on_register')
 
     def deregister(self):
-        assert self.is_registered, \
-            "this '%s' is not registered!" % self.__class__
+        self._assert_registered()
 
         self._hook('on_deregister')
         self.detach()
@@ -115,6 +119,5 @@ class BaseBridge:
             handler(event, *event.args, **event.kwargs)
 
     def send_event(self, source, target, name, *args, **kwargs):
-        assert self.is_registered, \
-            "this '%s' is not registered!" % self.__class__
+        self._assert_registered()
         self._manager.events.put(Event(source, target, name, *args, **kwargs))
