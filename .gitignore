@@ -1,2 +1,5 @@
 # Cache files for python
 __pycache__/
+
+# Editor files
+*.swp
