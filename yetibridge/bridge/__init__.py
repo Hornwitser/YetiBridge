@@ -99,7 +99,10 @@ class BaseBridge:
         self._hook('on_user_update', channel, before, after)
 
     def ev_user_remove(self, event, user_id):
+        channel = self.channels[event.target_id]
+        user = channel._users[user_id]
         del self.channels[event.target_id]._users[user_id]
+        self._hook('on_user_remove', channel, user)
 
     def ev_shutdown(self, event):
         self.detach()
