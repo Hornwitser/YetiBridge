@@ -104,6 +104,13 @@ class BaseBridge:
         del self.channels[event.target_id]._users[user_id]
         self._hook('on_user_remove', channel, user)
 
+    def get_user(self, user_id):
+        for channel in self.channels.values():
+            if user_id in channel._users:
+                return channel._users[user_id]
+
+        raise KeyError("no user with id '{}'".format(user_id))
+
     def ev_shutdown(self, event):
         self.detach()
 
