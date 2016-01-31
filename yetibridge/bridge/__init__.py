@@ -8,7 +8,7 @@ class Channel:
         self._name = name
         self._users = {}
 
-        for user_id, user in users:
+        for user_id, user in users.items():
             self._users[user_id] = User(user_id, user['name'])
 
     def copy(self):
