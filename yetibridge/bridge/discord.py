@@ -1,4 +1,5 @@
 import threading
+import time
 from asyncio import run_coroutine_threadsafe, get_event_loop_policy
 
 from discord import Client, Status
@@ -13,6 +14,11 @@ class DiscordBridge(BaseBridge):
         BaseBridge.__init__(self, config)
         self.users = {}
         self.user_map = {}
+        self.user_lock = threading.Lock()
+
+        self.leaving_users = {}
+        self.lv_thread = threading.Thread(target=self.leave_loop, daemon=True)
+        self.lv_thread.start()
 
         ready = threading.Event()
         self.thread = threading.Thread(target=self.run, args=(ready,))
@@ -79,63 +85,94 @@ class DiscordBridge(BaseBridge):
         except BaseException as e:
             self.send_event(self, Target.Manager, 'exception', e)
 
+    def leave_loop(self):
+        while True:
+            time.sleep(15)
+            with self.user_lock:
+                self.check_user_timeouts()
+
+    def check_user_timeouts(self):
+        leaving = []
+        for (discord_id, channel), timestamp in self.leaving_users.items():
+            if timestamp+self.config['timeout'] < time.time():
+                leaving.append((discord_id, channel))
+
+        for discord_id, channel in leaving:
+            del self.leaving_users[(discord_id, channel)]
+            self.user_timeout(discord_id, channel)
+
+    def user_timeout(self, discord_id, channel):
+        user_id = self.user_map[discord_id]
+        self.send_event(self, Target.Manager, 'user_leave',
+                        channel.id, user_id)
+
+        user_channels = self.users[user_id].channels
+        user_channels.remove(channel)
+
+        if not user_channels:
+            del self.users[user_id]
+            del self.user_map[discord_id]
+
     def discord_user_join(self, channel, discord_id, name):
-        if discord_id not in self.user_map:
-            user = DiscordUser(discord_id, {channel})
-            self.send_event(self, Target.Manager, 'user_join',
-                            channel.id, id(user), name)
+        with self.user_lock:
+            # Discard possible pending leave for the user
+            self.leaving_users.pop((discord_id, channel), None)
 
-            self.users[id(user)] = user
-            self.user_map[discord_id] = id(user)
-
-        else:
-            user = self.users[self.user_map[discord_id]]
-            if channel not in user.channels:
+            if discord_id not in self.user_map:
+                user = DiscordUser(discord_id, {channel})
                 self.send_event(self, Target.Manager, 'user_join',
                                 channel.id, id(user), name)
 
-                user.channels.add(channel)
+                self.users[id(user)] = user
+                self.user_map[discord_id] = id(user)
+
+            else:
+                user = self.users[self.user_map[discord_id]]
+                if channel not in user.channels:
+                    self.send_event(self, Target.Manager, 'user_join',
+                                    channel.id, id(user), name)
+
+                    user.channels.add(channel)
 
 
     def discord_name_change(self, channel, discord_id, new_name):
-        if discord_id in self.user_map:
-            self.send_event(self, Target.Manager, 'user_change',
-                            channel.id, self.user_map[discord_id], new_name)
+        with self.user_lock:
+            if discord_id in self.user_map:
+                self.send_event(self, Target.Manager, 'user_change',
+                                channel.id, self.user_map[discord_id],
+                                new_name)
 
     def discord_user_leave(self, channel, discord_id):
-        if discord_id in self.user_map:
-            user_id = self.user_map[discord_id]
-            self.send_event(self, Target.Manager, 'user_leave',
-                            channel.id, user_id)
-
-            user_channels = self.users[user_id].channels
-            user_channels.remove(channel)
-
-            if not user_channels:
-                del self.users[user_id]
-                del self.user_map[discord_id]
+        with self.user_lock:
+            if discord_id in self.user_map:
+                if (discord_id, channel) not in self.leaving_users:
+                    self.leaving_users[(discord_id, channel)] = time.time()
 
     def discord_channel_message(self, channel, discord_id, content):
-        if discord_id in self.user_map:
-            user_id = self.user_map[discord_id]
-            self.send_event(user_id, channel.id, 'message', content)
+        with self.user_lock:
+            if discord_id in self.user_map:
+                user_id = self.user_map[discord_id]
+                self.send_event(user_id, channel.id, 'message', content)
 
     def discord_channel_action(self, channel, discord_id, content):
-        if discord_id in self.user_map:
-            content = content[1:-1]
-            user_id = self.user_map[discord_id]
-            self.send_event(user_id, channel.id, 'action', content)
+        with self.user_lock:
+            if discord_id in self.user_map:
+                content = content[1:-1]
+                user_id = self.user_map[discord_id]
+                self.send_event(user_id, channel.id, 'action', content)
 
     def discord_private_message(self, user_id, discord_id, content):
-        if discord_id in self.user_map:
-            self.send_event(self.user_map[discord_id], user_id, 'message',
-                            content)
+        with self.user_lock:
+            if discord_id in self.user_map:
+                self.send_event(self.user_map[discord_id], user_id, 'message',
+                                content)
 
     def discord_private_action(self, user_id, discord_id, content):
-        if discord_id in self.user_map:
-            content = content[1:-1]
-            self.send_event(self.user_map[discord_id], user_id, 'message',
-                            content)
+        with self.user_lock:
+            if discord_id in self.user_map:
+                content = content[1:-1]
+                self.send_event(self.user_map[discord_id], user_id, 'message',
+                                content)
 
 
 class DiscordUser:
