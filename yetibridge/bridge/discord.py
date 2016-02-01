@@ -55,7 +55,7 @@ class DiscordBridge(BaseBridge):
             return
 
         name = self.get_user(event.source_id).name
-        content = '<{}> {}'.format(name, content)
+        content = '* {} {}'.format(name, content)
 
         if event.target_id in self.channels:
             self.bridge_bot.action(self.channels[event.target_id].name,
@@ -208,7 +208,6 @@ class DiscordBot(Client):
     def action(self, target_id, content):
         target_id = self.config['channels'][target_id]
 
-        content = '*{}*'.format(content)
         run_coroutine_threadsafe(self.do_msg(target_id, content),
                                  self.loop).result()
 
