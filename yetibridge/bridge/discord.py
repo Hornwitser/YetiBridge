@@ -1,3 +1,4 @@
+import re
 import threading
 import time
 from asyncio import run_coroutine_threadsafe, get_event_loop_policy
@@ -39,6 +40,21 @@ class DiscordBridge(BaseBridge):
         run_coroutine_threadsafe(self.bridge_bot.remove_channel(channel),
                                  self.bridge_bot.loop).result()
 
+    def decode_mentions(self, content, channel_id):
+        # TODO: Avoid using private member
+        users = self.channels[channel_id]._users
+
+        def replace(match):
+            user_id = int(match.group(1))
+            if user_id in self.users:
+                return '<@{}>'.format(self.users[user_id].discord_id)
+            elif user_id in users:
+                return '@{}'.format(users[user_id].name)
+            else:
+                return match.group()
+
+        return re.sub(r'<\[@([0-9]+)\]>', replace, content)
+
     def ev_message(self, event, content):
         if event.source_id in self.users:
             return
@@ -47,6 +63,7 @@ class DiscordBridge(BaseBridge):
         content = '<{}> {}'.format(name, content)
 
         if event.target_id in self.channels:
+            content = self.decode_mentions(content, event.target_id)
             self.bridge_bot.message(self.channels[event.target_id].name,
                                     content)
 
@@ -58,6 +75,7 @@ class DiscordBridge(BaseBridge):
         content = '* {} {}'.format(name, content)
 
         if event.target_id in self.channels:
+            content = self.decode_mentions(content, event.target_id)
             self.bridge_bot.action(self.channels[event.target_id].name,
                                    content)
 
@@ -148,29 +166,45 @@ class DiscordBridge(BaseBridge):
                 if (discord_id, channel) not in self.leaving_users:
                     self.leaving_users[(discord_id, channel)] = time.time()
 
-    def discord_channel_message(self, channel, discord_id, content):
+    def translate_mentions(self, content, mentions):
+        def replace(match):
+            discord_id = match.group(1)
+            if discord_id in self.user_map:
+                return '<[@{}]>'.format(self.user_map[discord_id])
+            else:
+                user = get(mentions, id=discord_id)
+                if user:
+                    return '@{}'.format(user.name)
+                else:
+                    return match.group()
+
+        return re.sub(r'<@([0-9]+)>', replace, content)
+
+    def discord_channel_message(self, channel, discord_id, content, mentions):
         with self.user_lock:
             if discord_id in self.user_map:
                 user_id = self.user_map[discord_id]
+                content = self.translate_mentions(content, mentions)
                 self.send_event(user_id, channel.id, 'message', content)
 
-    def discord_channel_action(self, channel, discord_id, content):
+    def discord_channel_action(self, channel, discord_id, content, mentions):
         with self.user_lock:
             if discord_id in self.user_map:
-                content = content[1:-1]
                 user_id = self.user_map[discord_id]
+                content = self.translate_mentions(content[1:-1], mentions)
                 self.send_event(user_id, channel.id, 'action', content)
 
-    def discord_private_message(self, user_id, discord_id, content):
+    def discord_private_message(self, user_id, discord_id, content, mentions):
         with self.user_lock:
             if discord_id in self.user_map:
+                content = self.translate_mentions(content, mentions)
                 self.send_event(self.user_map[discord_id], user_id, 'message',
                                 content)
 
-    def discord_private_action(self, user_id, discord_id, content):
+    def discord_private_action(self, user_id, discord_id, content, mentions):
         with self.user_lock:
             if discord_id in self.user_map:
-                content = content[1:-1]
+                content = self.translate_mentions(content[1:-1], mentions)
                 self.send_event(self.user_map[discord_id], user_id, 'message',
                                 content)
 
@@ -232,7 +266,8 @@ class DiscordBot(Client):
 
     async def on_message(self, message):
         if message.channel.is_private:
-            args = (self.user_id, message.author.id, message.clean_content)
+            args = (self.user_id, message.author.id,
+                    message.content, message.mentions)
             if self.is_action(message):
                 self.bridge.discord_private_action(*args)
             else:
@@ -291,13 +326,14 @@ class DiscordBridgeBot(DiscordBot):
         if message.channel.id in self.joined_channels:
             channel = self.joined_channels[message.channel.id]
             args = (channel, message.author.id)
+            content, mentions = message.content, message.mentions
             if message.attachments:
                 urls = ', '.join((a['url'] for a in message.attachments))
-                self.bridge.discord_channel_message(*args, urls)
+                self.bridge.discord_channel_message(*args, urls, mentions)
             elif self.is_action(message):
-                self.bridge.discord_channel_action(*args, message.content)
+                self.bridge.discord_channel_action(*args, content, mentions)
             else:
-                self.bridge.discord_channel_message(*args, message.content)
+                self.bridge.discord_channel_message(*args, content, mentions)
 
     async def add_channel(self, channel):
         await DiscordBot.add_channel(self, channel)

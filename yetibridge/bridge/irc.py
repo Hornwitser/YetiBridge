@@ -1,3 +1,4 @@
+import re
 import threading
 import logging
 
@@ -78,6 +79,19 @@ class IRCBridge(BaseBridge):
                     self.connecting.discard(user.id)
                     bot.disconnect()
 
+    def decode_mentions(self, content):
+        def replace(match):
+            user_id = int(match.group(1))
+            if user_id in self.users:
+                return '@{}'.format(self.users[user_id].nick)
+            elif user_id in self.user_bots:
+                nick = self.user_bots[user_id].connection.get_nickname()
+                return '@{}'.format(nick)
+            else:
+                return match.group()
+
+        return re.sub(r'<\[@([0-9]+)\]>', replace, content)
+
     def ev_message(self, event, content):
         if event.source_id in self.users:
             return
@@ -88,6 +102,8 @@ class IRCBridge(BaseBridge):
             name = self.get_user(event.source_id).name
             content = '<{}> {}'.format(name, content)
             bot = self.bridge_bot
+
+        content = self.decode_mentions(content)
 
         if event.target_id in self.channels:
             bot.message(self.channels[event.target_id].name, content)
@@ -105,6 +121,8 @@ class IRCBridge(BaseBridge):
             name = self.get_user(event.source_id).name
             content = '<{}> {}'.format(name, content)
             bot = self.bridge_bot
+
+        content = self.decode_mentions(content)
 
         if event.target_id in self.channels:
             bot.action(self.channels[event.target_id].name, content)
@@ -223,20 +241,46 @@ class IRCBridge(BaseBridge):
                 del self.users[user_id]
                 del self.user_map[nick]
 
+    def nick_map(self):
+        nick_map = IRCDict({b.connection.get_nickname(): i
+                       for i, b in self.user_bots.items()
+                           if b.connection.is_connected()})
+
+        nick_map.update(self.user_map)
+        return nick_map
+
+    def convert_mentions(self, message):
+        nick_map = self.nick_map()
+
+        def replace(match):
+            nick = match.group(1)
+            for i in range(len(nick), 0, -1):
+                part = nick[:i]
+                if part in nick_map:
+                    return '<[@{}]>{}'.format(nick_map[part], nick[i:])
+            else:
+                return match.group()
+
+        return re.sub(r'@([^ @]+)', replace, message)
+
     def irc_channel_message(self, channel, nick, message):
         if nick in self.user_map:
             user_id = self.user_map[nick]
+            message = self.convert_mentions(message)
             self.send_event(user_id, channel.id, 'message', message)
 
     def irc_channel_action(self, channel, nick, message):
         if nick in self.user_map:
             user_id = self.user_map[nick]
+            message = self.convert_mentions(message)
             self.send_event(user_id, channel.id, 'action', message)
 
     def irc_private_message(self, user_id, nick, message):
+        message = self.convert_mentions(message)
         self.send_event(self.user_map[nick], user_id, 'message', message)
 
     def irc_private_action(self, user_id, nick, message):
+        message = self.convert_mentions(message)
         self.send_event(self.user_map[nick], user_id, 'action', message)
 
 
