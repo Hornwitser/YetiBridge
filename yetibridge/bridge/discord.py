@@ -1,9 +1,11 @@
+import logging
 import re
 import threading
 import time
 from asyncio import run_coroutine_threadsafe, get_event_loop_policy
 
-from discord import Client, Status
+from aiohttp import ClientError
+from discord import Client, Status, HTTPException
 from discord.utils import get
 
 from . import BaseBridge
@@ -244,23 +246,28 @@ class DiscordBot(Client):
 
     def action(self, target_id, content):
         target_id = self.config['channels'][target_id]
-
-        run_coroutine_threadsafe(self.do_msg(target_id, content),
-                                 self.loop).result()
+        self.loop.call_soon_threadsafe(self.do_msg, target_id, content)
 
     def message(self, target_id, content):
         target_id = self.config['channels'][target_id]
+        self.loop.call_soon_threadsafe(self.do_msg, target_id, content)
 
-        run_coroutine_threadsafe(self.do_msg(target_id, content),
-                                 self.loop).result()
-
-    async def do_msg(self, target_id, content):
+    def do_msg(self, target_id, content):
         channel = self.get_channel(target_id)
         if channel is not None:
-            await self.send_message(channel, content)
-            return
+            task = self.loop.create_task(self.send_message(channel, content))
+            task.add_done_callback(lambda task: self.msg_done(task, content))
 
-        print("unkown target", target_id)
+        else:
+            print("unkown target", target_id)
+
+    def msg_done(self, task, content):
+        try:
+            task.result()
+        except (HTTPException, ClientError):
+            logging.exception('Error sending "{}"'.format(content))
+        except BaseException as e:
+            self.bridge.send_event(self, Target.Manager, 'exception', e)
 
     @staticmethod
     def is_action(message):
