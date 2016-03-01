@@ -2,7 +2,8 @@ import logging
 import re
 import threading
 import time
-from asyncio import run_coroutine_threadsafe, get_event_loop_policy
+from asyncio import run_coroutine_threadsafe, get_event_loop_policy, \
+                    new_event_loop
 
 from aiohttp import ClientError
 from discord import Client, Status, HTTPException
@@ -23,13 +24,12 @@ class DiscordBridge(BaseBridge):
         self.lv_thread = threading.Thread(target=self.leave_loop, daemon=True)
         self.lv_thread.start()
 
-        ready = threading.Event()
-        self.thread = threading.Thread(target=self.run, args=(ready,))
-        self.thread.start()
-        ready.wait()
+        self.loop = loop = new_event_loop()
+        self.bridge_bot = DiscordBridgeBot(self.config, self, id(self), loop)
 
     def on_register(self):
-        self.start.set()
+        self.thread = threading.Thread(target=self.run)
+        self.thread.start()
 
         for name in self.config['channels']:
             self.send_event(self, Target.Manager, 'channel_join', name)
@@ -93,14 +93,10 @@ class DiscordBridge(BaseBridge):
             run_coroutine_threadsafe(self.bridge_bot.close(),
                                      self.loop).result()
 
-    def run(self, ready):
+    def run(self):
         policy = get_event_loop_policy()
-        policy.set_event_loop(policy.new_event_loop())
-        self.bridge_bot = DiscordBridgeBot(self.config, self, id(self))
+        policy.set_event_loop(self.loop)
 
-        self.start = threading.Event()
-        ready.set()
-        self.start.wait()
 
         try:
             self.bridge_bot.run(self.config['user'], self.config['password'])
@@ -236,8 +232,8 @@ class DiscordUser:
 
 
 class DiscordBot(Client):
-    def __init__(self, config, bridge, user_id):
-        Client.__init__(self)
+    def __init__(self, config, bridge, user_id, loop):
+        Client.__init__(self, loop=loop)
 
         self.config = config
         self.bridge = bridge
