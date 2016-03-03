@@ -302,7 +302,8 @@ class DiscordBot(Client):
     @staticmethod
     def is_action(message):
         content = message.content
-        return content.startswith('_') and content.endswith('_')
+        return (len(content) > 2 and content[0] == content[-1] == '_'
+                and content[-2] != '_' and content[1] != '_')
 
     async def on_message(self, message):
         if message.channel.is_private:
