@@ -3,10 +3,10 @@ import re
 import threading
 import time
 from asyncio import run_coroutine_threadsafe, get_event_loop_policy, \
-                    new_event_loop
+                    new_event_loop, sleep
 
 from aiohttp import ClientError
-from discord import Client, Status, HTTPException
+from discord import Client, Status, HTTPException, GatewayNotFound
 from discord.utils import get
 
 from . import BaseBridge
@@ -97,12 +97,30 @@ class DiscordBridge(BaseBridge):
         policy = get_event_loop_policy()
         policy.set_event_loop(self.loop)
 
+        while True:
+            try:
+                task = self.bridge_bot.login(self.config['user'],
+                                             self.config['password'])
+                self.loop.run_until_complete(task)
 
-        try:
-            self.bridge_bot.run(self.config['user'], self.config['password'])
+            except (HTTPException, ClientError):
+                logging.exception("Failed to log in to Discord")
+                self.loop.run_until_complete(sleep(10))
 
-        except BaseException as e:
-            self.send_event(self, Target.Manager, 'exception', e)
+            else:
+                break
+
+        while not self.bridge_bot.is_closed:
+            try:
+                self.loop.run_until_complete(self.bridge_bot.sane_connect())
+
+            except (HTTPException, ClientError, GatewayNotFound):
+                logging.exception("Lost connection with Discord")
+                self.loop.run_until_complete(sleep(10))
+
+            except BaseException as e:
+                self.send_event(self, Target.Manager, 'exception', e)
+                break
 
     def leave_loop(self):
         while True:
@@ -239,6 +257,22 @@ class DiscordBot(Client):
         self.bridge = bridge
         self.user_id = user_id
         self.joined_channels = {}
+
+    async def sane_connect(self):
+        self.gateway = await self._get_gateway()
+        await self._make_websocket()
+
+        while not self.is_closed:
+            msg = await self.ws.recv()
+            if msg is None:
+                if self.ws.close_code == 1012:
+                    await self.redirect_websocket(self.gateway)
+                    continue
+                else:
+                    # Connection was dropped, break out
+                    break
+
+            await self.received_message(msg)
 
     def action(self, target_id, content):
         target_id = self.config['channels'][target_id]
