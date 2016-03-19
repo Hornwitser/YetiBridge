@@ -82,14 +82,14 @@ class DiscordBridge(BaseBridge):
                                    content)
 
     def ev_shutdown(self, event):
-        if self.bridge_bot._is_ready.is_set():
+        if self.loop.is_running() and self.bridge_bot._is_ready.is_set():
             run_coroutine_threadsafe(self.bridge_bot.close(),
                                      self.loop).result()
 
         self.detach()
 
     def on_terminate(self):
-        if self.bridge_bot._is_ready.is_set():
+        if self.loop.is_running() and self.bridge_bot._is_ready.is_set():
             run_coroutine_threadsafe(self.bridge_bot.close(),
                                      self.loop).result()
 
