@@ -147,7 +147,7 @@ class IRCBridge(BaseBridge):
                     if len(self.connecting) < 3 and self.connect_queue:
                         user_id = self.connect_queue.pop()
                         try:
-                            self.user_bots[user_id]._connect()
+                            self.user_bots[user_id].sane_connect()
                         except KeyError:
                             pass # User bot has been removed
                         else:
@@ -321,6 +321,12 @@ class IRCBot(SingleServerIRCBot):
 
     def die(self):
         raise RuntimeError("This function would have called sys.exit()")
+
+    def sane_connect(self):
+        server = self.server_list[0]
+        self.connect(server.host, server.port, self._nickname,
+                     server.password, ircname=self._realname,
+                     **self._SingleServerIRCBot__connect_params)
 
     def _part(self, content):
         lines = content.replace('\r', '\n').split('\n')
