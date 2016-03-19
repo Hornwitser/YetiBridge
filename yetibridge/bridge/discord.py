@@ -107,6 +107,10 @@ class DiscordBridge(BaseBridge):
                 logging.exception("Failed to log in to Discord")
                 self.loop.run_until_complete(sleep(10))
 
+            except BaseException as e:
+                self.send_event(self, Target.Manager, 'exception', e)
+                return
+
             else:
                 break
 
@@ -120,7 +124,7 @@ class DiscordBridge(BaseBridge):
 
             except BaseException as e:
                 self.send_event(self, Target.Manager, 'exception', e)
-                break
+                return
 
     def leave_loop(self):
         while True:
