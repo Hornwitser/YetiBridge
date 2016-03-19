@@ -8,6 +8,7 @@ from asyncio import run_coroutine_threadsafe, get_event_loop_policy, \
 from aiohttp import ClientError
 from discord import Client, Status, HTTPException, GatewayNotFound
 from discord.utils import get
+from websockets import InvalidHandshake, WebSocketProtocolError
 
 from . import BaseBridge
 from ..event import Event, Target
@@ -118,7 +119,8 @@ class DiscordBridge(BaseBridge):
             try:
                 self.loop.run_until_complete(self.bridge_bot.sane_connect())
 
-            except (HTTPException, ClientError, GatewayNotFound):
+            except (HTTPException, ClientError, GatewayNotFound,
+                    InvalidHandshake, WebSocketProtocolError):
                 logging.exception("Lost connection with Discord")
                 self.loop.run_until_complete(sleep(10))
 
