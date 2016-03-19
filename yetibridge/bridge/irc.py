@@ -5,6 +5,8 @@ import logging
 from unidecode import unidecode
 
 from irc.bot import SingleServerIRCBot
+from irc.buffer import LenientDecodingLineBuffer
+from irc.client import ServerConnection
 from irc.strings import IRCFoldedCase
 from irc.dict import IRCDict
 
@@ -306,6 +308,9 @@ class IRCUser:
     def nick(self):
         return self._nick
 
+
+# Prevent decoding errors from IRC clients that don't use UTF-8
+ServerConnection.buffer_class = LenientDecodingLineBuffer
 
 class IRCBot(SingleServerIRCBot):
     def __init__(self, nick, name, config, bridge, user_id):
