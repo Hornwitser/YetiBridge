@@ -374,13 +374,15 @@ class DiscordBridgeBot(DiscordBot):
             channel = self.joined_channels[message.channel.id]
             args = (channel, message.author.id)
             content, mentions = message.content, message.mentions
+
+            if self.is_action(message):
+                self.bridge.discord_channel_action(*args, content, mentions)
+            elif message.content:
+                self.bridge.discord_channel_message(*args, content, mentions)
+
             if message.attachments:
                 urls = ', '.join((a['url'] for a in message.attachments))
                 self.bridge.discord_channel_message(*args, urls, mentions)
-            elif self.is_action(message):
-                self.bridge.discord_channel_action(*args, content, mentions)
-            else:
-                self.bridge.discord_channel_message(*args, content, mentions)
 
     async def add_channel(self, channel):
         await DiscordBot.add_channel(self, channel)
