@@ -65,8 +65,11 @@ class DiscordBridge(BaseBridge):
         content = self.decode_mentions(content)
 
         if event.target_id in self.channels:
-            self.bridge_bot.message(self.channels[event.target_id].name,
-                                    content)
+            channel_name = self.channels[event.target_id].name
+            self.bridge_bot.message(channel_name, content)
+        elif event.target_id == Target.AllChannels:
+            for channel in self.channels.values():
+                self.bridge_bot.message(channel.name, content)
 
     def ev_action(self, event, content):
         if event.source_id in self.users:
@@ -81,8 +84,12 @@ class DiscordBridge(BaseBridge):
         content = self.decode_mentions(content)
 
         if event.target_id in self.channels:
-            self.bridge_bot.message(self.channels[event.target_id].name,
-                                    content)
+            channel = self.channels[event.target_id]
+            self.bridge_bot.message(channel.name, content)
+        elif event.target_id == Target.AllChannels:
+            for channel in self.channels.values():
+                self.bridge_bot.message(channel.name, content)
+
 
     def ev_shutdown(self, event):
         if self.loop.is_running() and self.bridge_bot._is_ready.is_set():

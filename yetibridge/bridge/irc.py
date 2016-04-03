@@ -111,6 +111,9 @@ class IRCBridge(BaseBridge):
             bot.message(self.channels[event.target_id].name, content)
         elif event.target_id in self.users:
             bot.message(self.users[event.target_id].nick, content)
+        elif event.target_id == Target.AllChannels:
+            for channel in self.channels.values():
+                bot.message(channel.name, content)
 
 
     def ev_action(self, event, content):
@@ -134,6 +137,9 @@ class IRCBridge(BaseBridge):
             method(self.channels[event.target_id].name, content)
         elif event.target_id in self.users:
             method(self.users[event.target_id].nick, content)
+        elif event.target_id == Target.AllChannels:
+            for channel in self.channels.values():
+                method(channel.name, content)
 
     def ev_shutdown(self, event):
         for bot in self.bots:
