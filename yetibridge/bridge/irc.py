@@ -118,7 +118,7 @@ class IRCBridge(BaseBridge):
             return
 
         if event.source_id in self.user_bots:
-            bot = self.user_bots[event.source_id]
+            method = self.user_bots[event.source_id].action
         else:
             try:
                 name = self.get_user(event.source_id).name
@@ -126,13 +126,14 @@ class IRCBridge(BaseBridge):
                 name = self.name(event.source_id)
 
             content = '* {} {}'.format(name, content)
+            method = self.bridge_bot.message
 
         content = self.decode_mentions(content)
 
         if event.target_id in self.channels:
-            bot.action(self.channels[event.target_id].name, content)
+            method(self.channels[event.target_id].name, content)
         elif event.target_id in self.users:
-            bot.message(self.users[event.target_id].nick, content)
+            method(self.users[event.target_id].nick, content)
 
     def ev_shutdown(self, event):
         for bot in self.bots:
