@@ -1,3 +1,4 @@
+import re
 import threading
 
 from . import BaseBridge
@@ -30,6 +31,43 @@ class ConsoleBridge(BaseBridge):
 
     def on_user_remove(self, channel, user):
         print('#{}: {} left'.format(channel.name, user.name))
+
+    def decode_mentions(self, content):
+        def replace(match):
+            user_id = int(match.group(1))
+            try:
+                return '@{}'.format(self.get_user(user_id).name)
+            except KeyError:
+                return match.group()
+
+        return re.sub(r'<\[@([0-9]+)\]>', replace, content)
+
+    def ev_message(self, event, content):
+        content = self.decode_mentions(content)
+
+        source = self.name(event.source_id)
+
+        if event.target_id != id(self):
+            target = '{}: '.format(self.name(event.target_id))
+        else:
+            target = ''
+
+        print('{}{} {}'.format(target, source, content))
+
+    def ev_action(self, event, content):
+        content = self.decode_mentions(content)
+
+        try:
+            source = '* {}'.format(self.get_user(event.source_id).name)
+        except KeyError:
+            source = '* {}'.format(self.name(event.source_id))
+
+        if event.target_id != id(self):
+            target = '{} '.format(self.name(event.target_id))
+        else:
+            target = ''
+
+        print('{}{} {}'.format(target, source, content))
 
     def run(self):
         while True:
