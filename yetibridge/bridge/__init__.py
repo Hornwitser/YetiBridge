@@ -104,6 +104,13 @@ class BaseBridge:
         del self.channels[event.target_id]._users[user_id]
         self._hook('on_user_remove', channel, user)
 
+    def get_channel_by_name(self, name):
+        for channel in self.channels.values():
+            if channel.name == name:
+                return channel
+
+        raise KeyError("no channel named '{}'".format(name))
+
     def get_user(self, user_id):
         for channel in self.channels.values():
             if user_id in channel._users:
