@@ -60,8 +60,8 @@ class DiscordBridge(BaseBridge):
         if event.source_id in self.users:
             return
 
-        name = self.get_user(event.source_id).name
-        content = '<{}> {}'.format(name, content)
+        name = self.name(event.source_id)
+        content = '{} {}'.format(name, content)
         content = self.decode_mentions(content)
 
         if event.target_id in self.channels:
@@ -72,7 +72,11 @@ class DiscordBridge(BaseBridge):
         if event.source_id in self.users:
             return
 
-        name = self.get_user(event.source_id).name
+        try:
+            name = self.get_user(event.source_id).name
+        except:
+            name = self.name(event.source_id)
+
         content = '* {} {}'.format(name, content)
         content = self.decode_mentions(content)
 

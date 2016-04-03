@@ -101,8 +101,8 @@ class IRCBridge(BaseBridge):
         if event.source_id in self.user_bots:
             bot = self.user_bots[event.source_id]
         else:
-            name = self.get_user(event.source_id).name
-            content = '<{}> {}'.format(name, content)
+            name = self.name(event.source_id)
+            content = '{} {}'.format(name, content)
             bot = self.bridge_bot
 
         content = self.decode_mentions(content)
@@ -120,9 +120,12 @@ class IRCBridge(BaseBridge):
         if event.source_id in self.user_bots:
             bot = self.user_bots[event.source_id]
         else:
-            name = self.get_user(event.source_id).name
-            content = '<{}> {}'.format(name, content)
-            bot = self.bridge_bot
+            try:
+                name = self.get_user(event.source_id).name
+            except KeyError:
+                name = self.name(event.source_id)
+
+            content = '* {} {}'.format(name, content)
 
         content = self.decode_mentions(content)
 
