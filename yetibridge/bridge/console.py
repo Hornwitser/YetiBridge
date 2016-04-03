@@ -111,6 +111,23 @@ class ConsoleBridge(BaseBridge):
             print(repr(result))
 
     @command
+    def say(self, channel_name, *content):
+        channel = self.get_channel_by_name(channel_name)
+        content = ' '.join(content)
+        self.send_event(self, channel.id, 'message', content)
+
+    @command
+    def action(self, channel_name, *content):
+        channel = self.get_channel_by_name(channel_name)
+        content = ' '.join(content)
+        self.send_event(self, channel.id, 'action', content)
+
+    @command
+    def broadcast(self, *content):
+        content = ' '.join(content)
+        self.send_event(self, Target.AllChannels, 'message', content)
+
+    @command
     def set(self, prop):
         if prop in ('eavesdrop', 'ev'):
             self._manager._eavesdropper = self.on_eavesdrop
