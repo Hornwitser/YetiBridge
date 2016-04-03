@@ -12,7 +12,6 @@ class ConsoleBridge(BaseBridge):
 
     def on_register(self):
         self._thread.start()
-        self._manager._eavesdropper = self.on_eavesdrop
 
         for channel_name in self.config['channels']:
             self.join(channel_name)
@@ -72,6 +71,15 @@ class ConsoleBridge(BaseBridge):
             print("{}: {}".format(e.__class__.__name__, e))
         else:
             print(repr(result))
+
+    @command
+    def set(self, prop):
+        if prop in ('eavesdrop', 'ev'):
+            self._manager._eavesdropper = self.on_eavesdrop
+        elif prop in ('noeavesdrop', 'noev'):
+            self._manager._eavesdropper = None
+        else:
+            print("error: unknown property '{}'".format(prop))
 
     @command
     def join(self, channel_name):
