@@ -43,18 +43,16 @@ class DiscordBridge(BaseBridge):
         run_coroutine_threadsafe(self.bridge_bot.remove_channel(channel),
                                  self.bridge_bot.loop).result()
 
-    def decode_mentions(self, content, channel_id):
-        # TODO: Avoid using private member
-        users = self.channels[channel_id]._users
-
+    def decode_mentions(self, content):
         def replace(match):
             user_id = int(match.group(1))
             if user_id in self.users:
                 return '<@{}>'.format(self.users[user_id].discord_id)
-            elif user_id in users:
-                return '@{}'.format(users[user_id].name)
             else:
-                return match.group()
+                try:
+                    return '@{}'.format(self.get_user(user_id).name)
+                except KeyError:
+                    return match.group()
 
         return re.sub(r'<\[@([0-9]+)\]>', replace, content)
 
@@ -64,9 +62,9 @@ class DiscordBridge(BaseBridge):
 
         name = self.get_user(event.source_id).name
         content = '<{}> {}'.format(name, content)
+        content = self.decode_mentions(content)
 
         if event.target_id in self.channels:
-            content = self.decode_mentions(content, event.target_id)
             self.bridge_bot.message(self.channels[event.target_id].name,
                                     content)
 
@@ -76,9 +74,9 @@ class DiscordBridge(BaseBridge):
 
         name = self.get_user(event.source_id).name
         content = '* {} {}'.format(name, content)
+        content = self.decode_mentions(content)
 
         if event.target_id in self.channels:
-            content = self.decode_mentions(content, event.target_id)
             self.bridge_bot.message(self.channels[event.target_id].name,
                                     content)
 
