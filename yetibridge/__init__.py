@@ -193,12 +193,13 @@ class BridgeManager:
                 bridges = (b for b in self._bridges.values() if b is not self)
 
             elif event.target_id == Target.AllChannels:
-                bridge_ids = {i for c in self._channels for i in c.bridges}
+                channels = self._channels.values()
+                bridge_ids = {i for c in channels for i in c.bridges}
                 bridges = (b for b in self._bridges.values()
                                if id(b) in bridge_ids)
 
             elif event.target_id == Target.AllUsers:
-                users = (u for c in self._channels for u in c.users)
+                users = (u for c in self._channels.values() for u in c.users)
                 bridge_ids = {u['bridge_id'] for u in users}
                 bridges = (b for b in self._bridges.values()
                                if id(b) in bridge_ids)
