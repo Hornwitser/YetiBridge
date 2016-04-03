@@ -1,5 +1,13 @@
 from ..event import Event, Target
 
+_target_name = {
+    id(Target.Everything): "Everything",
+    id(Target.Manager): "Manager",
+    id(Target.AllBridges): "All Bridges",
+    id(Target.AllChannels): "All Channels",
+    id(Target.AllUsers): "All Users",
+}
+
 class Channel:
     __slots__ = ('_id', '_name', '_users')
 
@@ -117,6 +125,33 @@ class BaseBridge:
                 return channel._users[user_id]
 
         raise KeyError("no user with id '{}'".format(user_id))
+
+    def name(self, item_id):
+        if type(item_id) is not int:
+            return repr(item_id)
+
+        if item_id in _target_name:
+            return '{{{}}}'.format(_target_name[item_id])
+
+        if item_id in self.channels:
+            return '#{}'.format(self.channels[item_id].name)
+
+        try:
+            return '[{}]'.format(self._manager._bridge_name(item_id))
+        except (KeyError, AttributeError):
+            pass
+
+        try:
+            return '#{}'.format(self._manager._channel_name(item_id))
+        except (KeyError, AttributeError):
+            pass
+
+        try:
+            return '<{}>'.format(self.get_user(item_id).name)
+        except KeyError:
+            pass
+
+        return str(item_id)
 
     def ev_shutdown(self, event):
         self.detach()
