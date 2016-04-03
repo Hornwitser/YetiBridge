@@ -79,8 +79,8 @@ class DiscordBridge(BaseBridge):
 
         if event.target_id in self.channels:
             content = self.decode_mentions(content, event.target_id)
-            self.bridge_bot.action(self.channels[event.target_id].name,
-                                   content)
+            self.bridge_bot.message(self.channels[event.target_id].name,
+                                    content)
 
     def ev_shutdown(self, event):
         if self.loop.is_running() and self.bridge_bot._is_ready.is_set():
@@ -282,6 +282,7 @@ class DiscordBot(Client):
 
     def action(self, target_id, content):
         target_id = self.config['channels'][target_id]
+        content = '_{}_'.format(content) # Yes, this is what /me does.
         self.loop.call_soon_threadsafe(self.do_msg, target_id, content)
 
     def message(self, target_id, content):
