@@ -92,9 +92,9 @@ class ConsoleBridge(BaseBridge):
     target_names = {
         id(Target.Everything): "Everything",
         id(Target.Manager): "Manager",
-        id(Target.AllBridges): "AllBridges",
-        id(Target.AllChannels): "AllChannels",
-        id(Target.AllUsers): "AllUsers",
+        id(Target.AllBridges): "All Bridges",
+        id(Target.AllChannels): "All Channels",
+        id(Target.AllUsers): "All Users",
     }
 
     def name(self, item_id):
@@ -102,13 +102,13 @@ class ConsoleBridge(BaseBridge):
             return repr(item_id)
 
         if item_id in self.target_names:
-            return self.target_names[item_id]
+            return '{{{}}}'.format(self.target_names[item_id])
 
         if item_id in self.channels:
             return '#{}'.format(self.channels[item_id].name)
 
         try:
-            return self._manager._bridge_name(item_id)
+            return '[{}]'.format(self._manager._bridge_name(item_id))
         except (KeyError, AttributeError):
             pass
 
@@ -117,9 +117,10 @@ class ConsoleBridge(BaseBridge):
         except (KeyError, AttributeError):
             pass
 
-        for channel in self.channels.values():
-            if item_id in channel._users:
-                return channel._users[item_id].name
+        try:
+            return '<{}>'.format(self.get_user(item_id).name)
+        except KeyError:
+            pass
 
         return str(item_id)
 
