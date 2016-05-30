@@ -344,7 +344,8 @@ class DiscordBridgeBot(DiscordBot):
         if member != self.user:
             if (discord_channel.permissions_for(member).read_messages
                     and member.status != Status.offline):
-                self.bridge.discord_user_join(channel, member.id, member.name)
+                self.bridge.discord_user_join(channel, member.id,
+                                              member.display_name)
             else:
                 self.bridge.discord_user_leave(channel, member.id)
 
@@ -363,9 +364,10 @@ class DiscordBridgeBot(DiscordBot):
             self.bridge.discord_user_leave(channel, member.id)
 
     async def on_member_update(self, before, after):
-        if after.name != before.name:
+        if after.display_name != before.display_name:
             for channel in self.joined_channels.values():
-                self.bridge.discord_name_change(channel, after.id, after.name)
+                self.bridge.discord_name_change(channel, after.id,
+                                                after.display_name)
 
         for discord_channel in after.server.channels:
             if discord_channel.id in self.joined_channels:
