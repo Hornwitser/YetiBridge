@@ -6,8 +6,10 @@ from asyncio import run_coroutine_threadsafe, get_event_loop_policy, \
                     new_event_loop, sleep
 
 from aiohttp import ClientError
-from discord import Client, Status, HTTPException, GatewayNotFound
+from discord import Client, Status, HTTPException, GatewayNotFound, \
+                    ConnectionClosed
 from discord.utils import get
+from discord.gateway import DiscordWebSocket, ReconnectWebSocket
 from websockets import InvalidHandshake, WebSocketProtocolError
 
 from . import BaseBridge
@@ -129,7 +131,8 @@ class DiscordBridge(BaseBridge):
                 self.loop.run_until_complete(self.bridge_bot.sane_connect())
 
             except (HTTPException, ClientError, GatewayNotFound,
-                    InvalidHandshake, WebSocketProtocolError):
+                    ConnectionClosed, InvalidHandshake,
+                    WebSocketProtocolError):
                 logging.exception("Lost connection with Discord")
                 self.loop.run_until_complete(sleep(10))
 
@@ -274,20 +277,18 @@ class DiscordBot(Client):
         self.joined_channels = {}
 
     async def sane_connect(self):
-        self.gateway = await self._get_gateway()
-        await self._make_websocket()
+        self.ws = await DiscordWebSocket.from_client(self)
 
         while not self.is_closed:
-            msg = await self.ws.recv()
-            if msg is None:
-                if self.ws.close_code == 1012:
-                    await self.redirect_websocket(self.gateway)
-                    continue
-                else:
-                    # Connection was dropped, break out
-                    break
-
-            await self.received_message(msg)
+            try:
+                await self.ws.poll_event()
+            except ReconnectWebSocket:
+                logging.info('Reconnecting the websocket.')
+                self.ws = await DiscordWebSocket.from_client(self)
+            except ConnectionClosed as e:
+                # yield from self.close() # This should not be done..
+                if e.code != 1000:
+                    raise
 
     def action(self, target_id, content):
         target_id = self.config['channels'][target_id]
