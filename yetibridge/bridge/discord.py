@@ -215,7 +215,7 @@ class DiscordBridge(BaseBridge):
                 else:
                     return match.group()
 
-        return re.sub(r'<@([0-9]+)>', replace, content)
+        return re.sub(r'<@!?([0-9]+)>', replace, content)
 
     def discord_channel_message(self, channel, discord_id, content, mentions):
         with self.user_lock:
