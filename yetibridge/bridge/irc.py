@@ -6,7 +6,7 @@ from unidecode import unidecode
 
 from irc.bot import SingleServerIRCBot
 from irc.buffer import LenientDecodingLineBuffer
-from irc.client import ServerConnection
+from irc.client import ServerConnection, ServerConnectionError
 from irc.strings import IRCFoldedCase
 from irc.dict import IRCDict
 
@@ -160,6 +160,10 @@ class IRCBridge(BaseBridge):
                         user_id = self.connect_queue.pop()
                         try:
                             self.user_bots[user_id].sane_connect()
+                        except ServerConnectionError:
+                            logging.error("Error connecting '{}'"
+                                          "".format(self.name(user_id)))
+                            self.connect_queue.add(user_id)
                         except KeyError:
                             pass # User bot has been removed
                         else:
