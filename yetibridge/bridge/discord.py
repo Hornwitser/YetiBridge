@@ -5,15 +5,15 @@ import time
 from asyncio import run_coroutine_threadsafe, get_event_loop_policy, \
                     new_event_loop, sleep
 
-from aiohttp import ClientError
-from discord import Client, Status, HTTPException, GatewayNotFound, \
-                    ConnectionClosed
+import aiohttp
+import discord
+from discord import Client, Status
 from discord.utils import get
-from discord.gateway import DiscordWebSocket, ReconnectWebSocket
-from websockets import InvalidHandshake, WebSocketProtocolError
+import websockets
 
 from . import BaseBridge
 from ..event import Event, Target
+from ..backoff import ExponentialBackoff
 
 
 class DiscordBridge(BaseBridge):
@@ -109,35 +109,19 @@ class DiscordBridge(BaseBridge):
         policy = get_event_loop_policy()
         policy.set_event_loop(self.loop)
 
-        while True:
+        task = self.bridge_bot.keep_running(self.config['token'])
+        try:
+            # This should not throw any exception other than
+            # the occasional KeyboardInterrupt
+            self.loop.run_until_complete(task)
+
+        except BaseException as e:
             try:
-                task = self.bridge_bot.login(self.config['token'])
-                self.loop.run_until_complete(task)
+                self.loop.run_until_complete(self.bridge_bot.logout())
+            except BaseException:
+                logging.exception("Ignoring exception while handling another")
 
-            except (HTTPException, ClientError):
-                logging.exception("Failed to log in to Discord")
-                self.loop.run_until_complete(sleep(10))
-
-            except BaseException as e:
-                self.send_event(self, Target.Manager, 'exception', e)
-                return
-
-            else:
-                break
-
-        while not self.bridge_bot.is_closed:
-            try:
-                self.loop.run_until_complete(self.bridge_bot.sane_connect())
-
-            except (HTTPException, ClientError, GatewayNotFound,
-                    ConnectionClosed, InvalidHandshake,
-                    WebSocketProtocolError):
-                logging.exception("Lost connection with Discord")
-                self.loop.run_until_complete(sleep(10))
-
-            except BaseException as e:
-                self.send_event(self, Target.Manager, 'exception', e)
-                return
+            self.send_event(self, Target.Manager, 'exception', e)
 
     def leave_loop(self):
         while True:
@@ -275,19 +259,41 @@ class DiscordBot(Client):
         self.user_id = user_id
         self.joined_channels = {}
 
-    async def sane_connect(self):
-        self.ws = await DiscordWebSocket.from_client(self)
+    async def keep_running(self, token):
+        """Like start(), only with reconnection logic"""
+        retry = ExponentialBackoff()
 
-        while not self.is_closed:
+        while True:
             try:
-                await self.ws.poll_event()
-            except ReconnectWebSocket:
-                logging.info('Reconnecting the websocket.')
-                self.ws = await DiscordWebSocket.from_client(self)
-            except ConnectionClosed as e:
-                # yield from self.close() # This should not be done..
-                if e.code != 1000:
-                    raise
+                await self.login(token)
+
+            except (discord.HTTPException, aiohttp.ClientError):
+                logging.exception("Failed to login to Discord")
+                delay = retry.delay()
+                logging.info("Retrying connection in {:.2f}s".format(delay))
+                await sleep(delay)
+
+            else:
+                break
+
+        while self.is_logged_in:
+            if self.is_closed:
+                self._closed.clear()
+                self.http.recreate()
+
+            try:
+                await self.connect()
+
+            except (discord.HTTPException, aiohttp.ClientError,
+                    discord.GatewayNotFound, discord.ConnectionClosed,
+                    websockets.InvalidHandshake,
+                    websockets.WebSocketProtocolError) as e:
+                if isinstance(e, discord.ConnectionClosed) and e.code == 4004:
+                    raise # Do not reconnect on authentication failure
+                logging.exception("Lost connection with Discord")
+                delay = retry.delay()
+                logging.info("Retrying connection in {:.2f}s".format(delay))
+                await sleep(delay)
 
     def action(self, target_id, content):
         target_id = self.config['channels'][target_id]
@@ -310,7 +316,7 @@ class DiscordBot(Client):
     def msg_done(self, task, content):
         try:
             task.result()
-        except (HTTPException, ClientError):
+        except (discord.HTTPException, aiohttp.ClientError):
             logging.exception('Error sending "{}"'.format(content))
         except BaseException as e:
             self.bridge.send_event(self, Target.Manager, 'exception', e)
