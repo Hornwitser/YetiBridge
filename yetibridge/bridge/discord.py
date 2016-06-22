@@ -111,8 +111,7 @@ class DiscordBridge(BaseBridge):
 
         while True:
             try:
-                task = self.bridge_bot.login(self.config['user'],
-                                             self.config['password'])
+                task = self.bridge_bot.login(self.config['token'])
                 self.loop.run_until_complete(task)
 
             except (HTTPException, ClientError):
