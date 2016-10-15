@@ -28,7 +28,7 @@ class ExponentialBackoff:
         self._base = base
 
         self._exp = 0
-        self._max_exp = 10
+        self._max = 10
         self._reset_time = base * 2 ** 11
         self._last_invocation = monotonic()
 
